@@ -1,0 +1,8 @@
+{
+  "eth_rpc": "http://eth-node:8546",
+  "eth_contract": "0xD885520B7EDF9a8577E87a3907c689AbB73582Ff",
+  "poll_interval": 30,
+  "auto_evolve": true,
+  "tm_tape_size": 5,
+  "checkpoint_interval": 100
+}
