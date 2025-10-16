@@ -266,133 +266,410 @@ function generateStatsFiles() {
 // Generate visualizer files
 function generateVisualizerFiles() {
     const visualizerHtml = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>HDGL Network Visualizer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌟 HDGL Lattice Field Visualizer 🌟</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gl-matrix@3.4.3/gl-matrix-min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; }
-        #container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, #0a0a0a, #1a1a2e, #16213e);
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .header {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            color: #ffd700;
+            text-shadow: 0 0 20px #ffd700;
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+
+        .controls {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .status-panel {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            min-width: 200px;
+        }
+
+        .lattice-canvas {
+            width: 100vw;
+            height: 100vh;
+            cursor: move;
+            background: radial-gradient(circle at 50% 50%, #001122, #000000);
+        }
+
+        button {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+        }
+
+        select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            color: white;
+            padding: 8px;
+            border-radius: 5px;
+        }
+
+        .status-item {
+            color: #ffd700;
+            margin: 5px 0;
+            font-size: 0.9em;
         }
     </style>
 </head>
 <body>
-    <div id="container"></div>
+    <div class="header">🌟 HDGL Lattice Field Visualizer 🌟</div>
+
+    <div class="controls">
+        <button onclick="resetView()">Reset View</button>
+        <select id="visualMode" onchange="changeMode()">
+            <option value="lattice">Lattice Network</option>
+            <option value="orbital">Orbital Mechanics</option>
+            <option value="breathing">Breathing Field</option>
+        </select>
+        <button onclick="toggleAnimation()">Toggle Animation</button>
+    </div>
+
+    <div class="status-panel">
+        <div class="status-item">Evolution: <span id="evolution">0</span></div>
+        <div class="status-item">Variance: <span id="variance">0.000000</span></div>
+        <div class="status-item">Nodes: <span id="nodeCount">0</span></div>
+        <div class="status-item">Phase: <span id="phase">0.000</span></div>
+        <div class="status-item">Mode: <span id="currentMode">Lattice</span></div>
+    </div>
+
+    <canvas id="latticeCanvas" class="lattice-canvas"></canvas>
+
     <script>
         const socket = io('/visualizer');
-        let scene, camera, renderer;
-        let nodes = [];
-        let nodeObjects = [];
 
-        function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x000033); // Dark blue background instead of black
+        // Constants inspired by enhanced_pot_visualizer2.html
+        const PHI = 1.618033988749895;
+        const INV_PHI = 1 / PHI;
+        const GOLDEN_ANGLE = 2 * Math.PI * INV_PHI;
 
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 20;
+        class HDGLLatticeVisualizer {
+            constructor() {
+                this.canvas = document.getElementById('latticeCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.setupCanvas();
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.getElementById('container').appendChild(renderer.domElement);
+                this.transform = { scale: 1, translateX: 0, translateY: 0, rotation: 0 };
+                this.animationPhase = 0;
+                this.isAnimating = true;
+                this.visualMode = 'lattice';
+                this.networkData = { nodes: [], phase_data: {} };
 
-            // Add some ambient light so we can see objects
-            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-            scene.add(ambientLight);
+                this.setupEventListeners();
+                this.animate();
+            }
 
-            // Add a directional light
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(1, 1, 1);
-            scene.add(directionalLight);
+            setupCanvas() {
+                this.canvas.width = window.innerWidth * devicePixelRatio;
+                this.canvas.height = window.innerHeight * devicePixelRatio;
+                this.ctx.scale(devicePixelRatio, devicePixelRatio);
+                this.canvasWidth = window.innerWidth;
+                this.canvasHeight = window.innerHeight;
+            }
 
-            // Add initial demo nodes if no data yet
-            createDemoNodes();
+            setupEventListeners() {
+                let isDragging = false;
+                let lastX, lastY;
+
+                this.canvas.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                });
+
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const dx = (e.clientX - lastX) / this.transform.scale;
+                        const dy = (e.clientY - lastY) / this.transform.scale;
+                        this.transform.translateX += dx;
+                        this.transform.translateY += dy;
+                        lastX = e.clientX;
+                        lastY = e.clientY;
+                    }
+                });
+
+                this.canvas.addEventListener('mouseup', () => { isDragging = false; });
+
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                    this.transform.scale *= zoomFactor;
+                    this.transform.scale = Math.max(0.1, Math.min(5, this.transform.scale));
+                });
+
+                window.addEventListener('resize', () => this.setupCanvas());
+            }
+
+            updateNetworkData(data) {
+                this.networkData = data;
+                if (data.phase_data) {
+                    document.getElementById('evolution').textContent = data.phase_data.evolution_count || 0;
+                    document.getElementById('variance').textContent = (data.phase_data.phase_variance || 0).toFixed(6);
+                    document.getElementById('phase').textContent = ((data.phase_data.phase_variance || 0) % 1).toFixed(3);
+                }
+                document.getElementById('nodeCount').textContent = (data.nodes || []).length;
+            }
+
+            animate() {
+                if (this.isAnimating) {
+                    this.animationPhase += 0.02;
+                }
+
+                this.render();
+                requestAnimationFrame(() => this.animate());
+            }
+
+            render() {
+                this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+                // Apply transformations
+                this.ctx.save();
+                this.ctx.translate(this.canvasWidth / 2, this.canvasHeight / 2);
+                this.ctx.scale(this.transform.scale, this.transform.scale);
+                this.ctx.translate(this.transform.translateX, this.transform.translateY);
+                this.ctx.rotate(this.transform.rotation);
+
+                switch (this.visualMode) {
+                    case 'lattice':
+                        this.renderLatticeNetwork();
+                        break;
+                    case 'orbital':
+                        this.renderOrbitalMechanics();
+                        break;
+                    case 'breathing':
+                        this.renderBreathingField();
+                        break;
+                }
+
+                this.ctx.restore();
+            }
+
+            renderLatticeNetwork() {
+                const nodes = this.networkData.nodes || [];
+                const centerX = 0, centerY = 0;
+                const evolution = this.networkData.phase_data?.evolution_count || 0;
+                const variance = this.networkData.phase_data?.phase_variance || 1.123;
+
+                // Draw central hub with breathing effect
+                const hubRadius = 15 + 5 * Math.sin(this.animationPhase * 0.618);
+                const hubColor = this.networkData.phase_data?.consensus_locked ? '#00ff88' : '#ff6b6b';
+
+                this.ctx.fillStyle = hubColor;
+                this.ctx.strokeStyle = '#ffd700';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, hubRadius, 0, 2 * Math.PI);
+                this.ctx.fill();
+                this.ctx.stroke();
+
+                // Draw lattice nodes in golden spiral
+                nodes.forEach((node, i) => {
+                    const angle = i * GOLDEN_ANGLE + this.animationPhase * 0.1;
+                    const radius = 50 + Math.sqrt(i + 1) * 30;
+                    const nodeX = Math.cos(angle) * radius;
+                    const nodeY = Math.sin(angle) * radius;
+
+                    // Individual node breathing based on variance
+                    const nodeBreathe = 1 + 0.3 * Math.sin(this.animationPhase * 0.5 + i * 0.618 + variance);
+                    const nodeRadius = (5 + i % 3) * nodeBreathe;
+
+                    // Color based on position in lattice
+                    const hue = (i * 137.5 + variance * 100) % 360; // Golden angle in degrees
+                    const nodeColor = \`hsl(\${hue}, 70%, 60%)\`;
+
+                    // Draw connection to center
+                    this.ctx.strokeStyle = \`\${nodeColor}66\`;
+                    this.ctx.lineWidth = 1;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(centerX, centerY);
+                    this.ctx.lineTo(nodeX, nodeY);
+                    this.ctx.stroke();
+
+                    // Draw node
+                    this.ctx.fillStyle = nodeColor;
+                    this.ctx.beginPath();
+                    this.ctx.arc(nodeX, nodeY, nodeRadius, 0, 2 * Math.PI);
+                    this.ctx.fill();
+
+                    // Draw node glow
+                    const gradient = this.ctx.createRadialGradient(nodeX, nodeY, 0, nodeX, nodeY, nodeRadius * 3);
+                    gradient.addColorStop(0, \`\${nodeColor}44\`);
+                    gradient.addColorStop(1, 'transparent');
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.beginPath();
+                    this.ctx.arc(nodeX, nodeY, nodeRadius * 3, 0, 2 * Math.PI);
+                    this.ctx.fill();
+                });
+            }
+
+            renderOrbitalMechanics() {
+                const nodes = this.networkData.nodes || [];
+                const evolution = this.networkData.phase_data?.evolution_count || 0;
+                const variance = this.networkData.phase_data?.phase_variance || 1.123;
+
+                // Multiple orbital rings
+                const rings = 5;
+                for (let ring = 0; ring < rings; ring++) {
+                    const ringRadius = 50 + ring * 40;
+                    const nodesInRing = Math.max(1, Math.floor(nodes.length / rings));
+                    const ringSpeed = (ring + 1) * 0.005 * (variance - 1);
+
+                    for (let n = 0; n < nodesInRing && ring * nodesInRing + n < nodes.length; n++) {
+                        const angle = (n / nodesInRing) * 2 * Math.PI + this.animationPhase * ringSpeed;
+                        const x = Math.cos(angle) * ringRadius;
+                        const y = Math.sin(angle) * ringRadius;
+
+                        const nodeIndex = ring * nodesInRing + n;
+                        const nodeRadius = 3 + (nodeIndex % 5);
+                        const orbitalBreathe = 1 + 0.2 * Math.sin(this.animationPhase + nodeIndex);
+
+                        // Draw orbital trail
+                        this.ctx.strokeStyle = \`hsl(\${ring * 60 + 30}, 50%, 40%)\`;
+                        this.ctx.lineWidth = 0.5;
+                        this.ctx.beginPath();
+                        this.ctx.arc(0, 0, ringRadius, 0, 2 * Math.PI);
+                        this.ctx.stroke();
+
+                        // Draw orbiting node
+                        this.ctx.fillStyle = \`hsl(\${ring * 60 + 30}, 70%, 60%)\`;
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, nodeRadius * orbitalBreathe, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                    }
+                }
+            }
+
+            renderBreathingField() {
+                const nodes = this.networkData.nodes || [];
+                const variance = this.networkData.phase_data?.phase_variance || 1.123;
+
+                // Global breathing rhythm
+                const globalBreathe = 1 + 0.4 * Math.sin(this.animationPhase * 0.618);
+
+                // Create breathing hexagonal grid
+                const gridSize = 40;
+                const rows = 15;
+                const cols = 20;
+
+                for (let row = -rows/2; row < rows/2; row++) {
+                    for (let col = -cols/2; col < cols/2; col++) {
+                        const x = col * gridSize + (row % 2) * (gridSize/2);
+                        const y = row * gridSize * 0.866; // hexagonal spacing
+
+                        const distance = Math.sqrt(x*x + y*y);
+                        const wave = Math.sin(distance * 0.01 - this.animationPhase * 0.1);
+                        const localBreathe = globalBreathe * (1 + 0.3 * wave);
+
+                        const cellRadius = 8 * localBreathe;
+                        const intensity = Math.max(0, 1 - distance / 400);
+
+                        if (intensity > 0) {
+                            // Breathing cell with variance-influenced color
+                            const hue = (variance * 100 + wave * 30) % 360;
+                            this.ctx.fillStyle = \`hsla(\${hue}, 60%, 50%, \${intensity * 0.6})\`;
+                            this.ctx.beginPath();
+                            this.ctx.arc(x, y, cellRadius, 0, 2 * Math.PI);
+                            this.ctx.fill();
+                        }
+                    }
+                }
+            }
         }
 
+        // Global functions
+        let visualizer;
+
+        function resetView() {
+            if (visualizer) {
+                visualizer.transform = { scale: 1, translateX: 0, translateY: 0, rotation: 0 };
+            }
+        }
+
+        function changeMode() {
+            const mode = document.getElementById('visualMode').value;
+            if (visualizer) {
+                visualizer.visualMode = mode;
+                document.getElementById('currentMode').textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+            }
+        }
+
+        function toggleAnimation() {
+            if (visualizer) {
+                visualizer.isAnimating = !visualizer.isAnimating;
+            }
+        }
+
+        // Socket.IO connections
         socket.on('connect', function() {
-            console.log('Visualizer connected!');
+            console.log('HDGL Lattice Visualizer connected!');
         });
 
         socket.on('network_data', function(data) {
-            console.log('Network data received:', data);
-            updateVisualization(data);
+            console.log('Lattice data received:', data);
+            if (visualizer) {
+                visualizer.updateNetworkData(data);
+            }
         });
 
-        function updateVisualization(data) {
-            // Clear existing nodes
-            nodeObjects.forEach(obj => scene.remove(obj));
-            nodeObjects = [];
-
-            // Create new nodes based on network data
-            if (data.nodes && data.nodes.length > 0) {
-                data.nodes.forEach((node, index) => {
-                    const geometry = new THREE.SphereGeometry(0.5, 16, 12);
-                    const material = new THREE.MeshLambertMaterial({
-                        color: data.phase_data?.consensus_locked ? 0x00ff00 : 0xff6600,
-                        emissive: data.phase_data?.consensus_locked ? 0x001100 : 0x110000
-                    });
-                    const sphere = new THREE.Mesh(geometry, material);
-
-                    sphere.position.set(node.x || 0, node.y || 0, node.z || 0);
-                    scene.add(sphere);
-                    nodeObjects.push(sphere);
-                });
-
-                // Update camera position based on network size
-                camera.position.z = Math.max(20, data.nodes?.length || 10);
-            }
-
-            // Update title with network info
-            document.title = \`HDGL Visualizer - \${data.nodes?.length || 0} nodes\`;
-        }
-
-        function createDemoNodes() {
-            // Create some demo nodes while waiting for real data
-            for (let i = 0; i < 8; i++) {
-                const geometry = new THREE.SphereGeometry(0.3, 12, 8);
-                const material = new THREE.MeshLambertMaterial({
-                    color: 0x4444ff,
-                    emissive: 0x000044
-                });
-                const sphere = new THREE.Mesh(geometry, material);
-
-                // Arrange in a circle
-                const angle = (i / 8) * Math.PI * 2;
-                sphere.position.set(Math.cos(angle) * 5, Math.sin(angle) * 5, 0);
-                scene.add(sphere);
-                nodeObjects.push(sphere);
-            }
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // Rotate nodes slowly
-            nodeObjects.forEach((obj, index) => {
-                obj.rotation.y += 0.01;
-                obj.rotation.x += 0.005;
-            });
-
-            renderer.render(scene, camera);
-        }
-
-        init();
-        animate();
+        // Initialize visualizer
+        document.addEventListener('DOMContentLoaded', function() {
+            visualizer = new HDGLLatticeVisualizer();
+        });
     </script>
 </body>
 </html>`;
 
     ensureDir('static/visualizer');
     fs.writeFileSync('static/visualizer/index.html', visualizerHtml);
-}
-
-// Generate basic shader files
+}// Generate basic shader files
 function generateShaderFiles() {
     const vertexShader = `
 uniform float time;
