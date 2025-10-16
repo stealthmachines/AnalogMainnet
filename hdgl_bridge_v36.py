@@ -586,6 +586,9 @@ def derive_state_at_evo(seed: int, evo: int, tape_size: int = 3, checkpoint_mgr:
         for j in range(8):
             state.dimensions[j] += mp.mpc('0.01') * (det_rand(seed + i + j) - mp.mpf('0.5'))
 
+        # Update evolution count in state memory
+        state.memory['evolution_count'] = i + 1
+
         # Checkpoint at intervals
         if checkpoint_mgr and i % CHECKPOINT_INTERVAL == 0 and i > checkpoint_evo:
             cid = checkpoint_to_ipfs(state, i, seed)
@@ -755,13 +758,11 @@ if __name__ == "__main__":
         tape_size = 5  # Standard tape size for production
 
         while True:
-            # Every iteration, derive state up to next checkpoint interval
-            target_evo = evolution_count + CHECKPOINT_INTERVAL
-            state = derive_state_at_evo(evolution_seed, target_evo,
+            # Evolve one step at a time for real-time updates
+            evolution_count += 1
+            state = derive_state_at_evo(evolution_seed, evolution_count,
                                       tape_size=tape_size,
                                       checkpoint_mgr=ckpt_mgr)
-
-            evolution_count = state.memory['evolution_count']
 
             # Check for consensus
             detect_harmonic_consensus(state)
@@ -779,7 +780,7 @@ if __name__ == "__main__":
             else:
                 logger.info(f"Evolution at step {evolution_count} (var={float(state.memory['phase_var']):.6f})")
 
-            time.sleep(1)  # Prevent tight loop
+            time.sleep(0.5)  # Faster updates for real-time display
     except KeyboardInterrupt:
         logger.info("Shutting down gracefully...")
     except Exception as e:

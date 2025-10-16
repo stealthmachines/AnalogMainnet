@@ -1,11 +1,11 @@
 # Multi-stage build for HDGL Analog Mainnet
-FROM node:18-alpine as static-builder
+FROM node:18-alpine AS static-builder
 
 WORKDIR /app
 COPY generate_static.js ./
 RUN node generate_static.js
 
-FROM python:3.9-slim as runtime
+FROM python:3.9-slim AS runtime
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
