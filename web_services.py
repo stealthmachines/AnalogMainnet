@@ -13,7 +13,7 @@ with open('config.json', 'r') as f:
 # Explorer Service
 @app.route('/explorer')
 def explorer():
-    return render_template('explorer/index.html')
+    return send_from_directory('static/explorer', 'index.html')
 
 @socketio.on('connect', namespace='/explorer')
 def explorer_connect():
@@ -22,7 +22,7 @@ def explorer_connect():
 # Program Service
 @app.route('/program')
 def program():
-    return render_template('program/index.html')
+    return send_from_directory('static/program', 'index.html')
 
 @socketio.on('connect', namespace='/program')
 def program_connect():
@@ -31,7 +31,7 @@ def program_connect():
 # Visualizer Service
 @app.route('/visualizer')
 def visualizer():
-    return render_template('visualizer/index.html')
+    return send_from_directory('static/visualizer', 'index.html')
 
 @socketio.on('connect', namespace='/visualizer')
 def visualizer_connect():
@@ -40,7 +40,7 @@ def visualizer_connect():
 # Stats Service
 @app.route('/stats')
 def stats():
-    return render_template('stats/index.html')
+    return send_from_directory('static/stats', 'index.html')
 
 @socketio.on('connect', namespace='/stats')
 def stats_connect():
@@ -60,8 +60,8 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
 
     if service == 'all':
-        socketio.run(app, host='0.0.0.0', port=port)
+        socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
     else:
         # Individual service mode (for containerized deployment)
         app.config['SERVICE_TYPE'] = service
-        socketio.run(app, host='0.0.0.0', port=port)
+        socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
