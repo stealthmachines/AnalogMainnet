@@ -18,20 +18,124 @@
 </head>
 <body>
     <div id="container"></div>
+    <div id="info" style="position: absolute; top: 10px; left: 10px; color: white; font-family: monospace; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 4px;">
+        <div>Evolution: <span id="evolution">0</span></div>
+        <div>Phase Var: <span id="variance">0.000</span></div>
+        <div>Consensus: <span id="consensus">Unlocked</span></div>
+    </div>
     <script>
-        const socket = io();
+        const socket = io('/visualizer');
         let scene, camera, renderer;
+        let nodes = [], connections = [];
+        let nodeGeometry, nodeMaterial;
 
         function init() {
             scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000011);
+
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer();
+            camera.position.set(0, 0, 300);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
+
+            // Add lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(100, 100, 100);
+            scene.add(directionalLight);
+
+            animate();
         }
 
-        socket.on('state_update', function(data) {
-            // Visualization update logic will be handled by visualizer_server.js
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate the entire scene
+            scene.rotation.y += 0.005;
+
+            // Animate node phases
+            nodes.forEach((node, i) => {
+                if (node.userData.phase !== undefined) {
+                    node.position.z = Math.sin(node.userData.phase + Date.now() * 0.001) * 20;
+                    node.material.color.setHSL((node.userData.phase / (2 * Math.PI)) * 0.7, 1.0, 0.6);
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        function updateVisualization(data) {
+            // Clear existing nodes
+            nodes.forEach(node => scene.remove(node));
+            connections.forEach(connection => scene.remove(connection));
+            nodes = [];
+            connections = [];
+
+            // Create nodes
+            nodeGeometry = new THREE.SphereGeometry(8, 16, 16);
+
+            data.nodes.forEach((nodeData, i) => {
+                nodeMaterial = new THREE.MeshPhongMaterial({
+                    color: nodeData.active ? 0x00ff00 : 0xff0000,
+                    transparent: true,
+                    opacity: 0.8
+                });
+
+                const node = new THREE.Mesh(nodeGeometry, nodeMaterial);
+                node.position.set(nodeData.x, nodeData.y, nodeData.z);
+                node.userData = { phase: nodeData.phase };
+
+                scene.add(node);
+                nodes.push(node);
+            });
+
+            // Create connections
+            data.connections.forEach(connection => {
+                const geometry = new THREE.BufferGeometry();
+                const sourceNode = data.nodes[connection.source];
+                const targetNode = data.nodes[connection.target];
+
+                const positions = new Float32Array([
+                    sourceNode.x, sourceNode.y, sourceNode.z,
+                    targetNode.x, targetNode.y, targetNode.z
+                ]);
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                const material = new THREE.LineBasicMaterial({
+                    color: 0x0080ff,
+                    transparent: true,
+                    opacity: connection.strength
+                });
+
+                const line = new THREE.Line(geometry, material);
+                scene.add(line);
+                connections.push(line);
+            });
+        }
+
+        socket.on('network_data', function(data) {
+            updateVisualization(data);
+
+            // Update info display
+            document.getElementById('evolution').textContent = data.phase_data.evolution_count;
+            document.getElementById('variance').textContent = data.phase_data.phase_variance.toFixed(6);
+            document.getElementById('consensus').textContent = data.phase_data.consensus_locked ? 'Locked' : 'Unlocked';
+        });
+
+        socket.on('connect', function() {
+            console.log('Connected to visualizer');
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
         init();

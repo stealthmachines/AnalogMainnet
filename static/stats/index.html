@@ -17,16 +17,120 @@
 </head>
 <body>
     <h1>HDGL Network Statistics</h1>
+
     <div class="chart-container">
+        <h3>System Overview</h3>
+        <div id="overview" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div><strong>Evolution Count:</strong> <span id="evolutionCount">0</span></div>
+            <div><strong>Phase Variance:</strong> <span id="phaseVariance">0.000</span></div>
+            <div><strong>Consensus Status:</strong> <span id="consensusStatus">Unlocked</span></div>
+            <div><strong>Active Connections:</strong> <span id="activeConnections">0</span></div>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <h3>Phase Variance Over Time</h3>
         <canvas id="phaseChart"></canvas>
     </div>
+
     <div class="chart-container">
-        <canvas id="consensusChart"></canvas>
+        <h3>System Resources</h3>
+        <canvas id="resourceChart"></canvas>
     </div>
+
     <script>
-        const socket = io();
+        const socket = io('/stats');
+
+        // Phase variance chart
+        const phaseCtx = document.getElementById('phaseChart').getContext('2d');
+        const phaseChart = new Chart(phaseCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Phase Variance',
+                    data: [],
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 2.0
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                }
+            }
+        });
+
+        // Resource usage chart
+        const resourceCtx = document.getElementById('resourceChart').getContext('2d');
+        const resourceChart = new Chart(resourceCtx, {
+            type: 'bar',
+            data: {
+                labels: ['CPU Usage', 'Memory Usage', 'Network Latency', 'Consensus Health'],
+                datasets: [{
+                    label: 'System Resources',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 205, 86, 0.6)',
+                        'rgba(75, 192, 192, 0.6)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+
         socket.on('stats_update', function(data) {
-            // Chart update logic will be handled by stats_server.js
+            // Update overview
+            document.getElementById('evolutionCount').textContent = data.evolution_count;
+            document.getElementById('phaseVariance').textContent = data.phase_variance.toFixed(6);
+            document.getElementById('consensusStatus').textContent = data.consensus_locked ? 'Locked' : 'Unlocked';
+            document.getElementById('activeConnections').textContent = data.active_connections;
+
+            // Update phase variance chart
+            const now = new Date().toLocaleTimeString();
+            phaseChart.data.labels.push(now);
+            phaseChart.data.datasets[0].data.push(data.phase_variance);
+
+            // Keep only last 20 points
+            if (phaseChart.data.labels.length > 20) {
+                phaseChart.data.labels.shift();
+                phaseChart.data.datasets[0].data.shift();
+            }
+
+            phaseChart.update('none');
+
+            // Update resource chart
+            resourceChart.data.datasets[0].data = [
+                data.memory_usage.cpu_usage,
+                data.memory_usage.memory_usage,
+                data.memory_usage.network_latency,
+                data.memory_usage.consensus_health * 100
+            ];
+            resourceChart.update('none');
+        });
+
+        socket.on('connect', function() {
+            console.log('Connected to stats');
         });
     </script>
 </body>
