@@ -606,7 +606,7 @@ def test_consensus_detection():
         if state.memory['locked']:
             logger.info(f"✓ Consensus achieved at iteration {iteration}")
             break
-    
+
     if not state.memory['locked']:
         logger.warning(f"✗ Consensus not achieved after 150 iterations, variance={float(state.memory['phase_var']):.8f}")
         # For testing purposes, let's be less strict and continue
