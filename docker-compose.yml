@@ -3,27 +3,42 @@ version: '3.8'
 services:
   hdgl-bridge:
     build: .
+    profiles:
+      - all
+      - bridge
     volumes:
       - ./data:/app/data
-      # Note: hardware I2C device mapping (/dev/i2c-1) is Linux-only and
-      # causes errors on Windows hosts. To enable I2C on a Linux host,
-      # run docker compose with the optional override file:
-      #   docker compose -f docker-compose.yml -f docker-compose.i2c.yml up
-    # Device mappings removed from the main compose to keep it cross-platform.
-    # Use the optional override file `docker-compose.i2c.yml` on Linux hosts
-    # to add `devices:` entries.
     environment:
       - ETH_PRIVATE_KEY=${ETH_PRIVATE_KEY}
+      - SERVICE_TYPE=bridge
     depends_on:
       - ipfs
       - eth-node
     restart: unless-stopped
 
+  hdgl-web:
+    build: .
+    profiles:
+      - all
+      - webhost
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./static:/app/static
+      - ./templates:/app/templates
+    environment:
+      - SERVICE_TYPE=web
+    command: ["python", "web_services.py"]
+    restart: unless-stopped
+
   ipfs:
     image: ipfs/go-ipfs:latest
+    profiles:
+      - all
+      - ipfs
     ports:
       - "5001:5001"
-      - "8080:8080"
+      - "8081:8080"  # Changed to avoid conflict with web service
       - "4001:4001"  # Swarm port
     volumes:
       - ipfs-data:/data/ipfs
@@ -48,4 +63,4 @@ volumes:
 networks:
   default:
     name: hdgl_network
-    external: true
+    driver: bridge

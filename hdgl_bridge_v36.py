@@ -49,14 +49,14 @@ def dec_to_mpc(x):
     return mp.mpc(x)
 
 # Analog Constants (Tuned to match C)
-GAMMA = mp.mpf('0.1')
+GAMMA = mp.mpf('0.02')
 LAMBDA = mp.mpf('0.05')
 SAT_LIMIT = mp.mpf('1e6')
 NOISE_SIGMA = mp.mpf('0.01')
-CONSENSUS_EPS = mp.mpf('0.005')  # Tighter
-CONSENSUS_N = 10  # More stable
+CONSENSUS_EPS = mp.mpf('1e-6')  # Consensus threshold
+CONSENSUS_N = 100  # Consensus iterations
 ADAPT_THRESH = mp.mpf('0.8')
-K_COUPLING = mp.mpf('0.15')
+K_COUPLING = mp.mpf('1.0')
 CHECKPOINT_INTERVAL = 100
 SNAPSHOT_MAX = 10
 SNAPSHOT_DECAY = mp.mpf('0.95')

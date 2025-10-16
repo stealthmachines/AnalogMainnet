@@ -4,6 +4,11 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <unistd.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 // --- System Constants ---
 #define PHI 1.6180339887498948
@@ -14,14 +19,14 @@
 #define MSB_MASK (1ULL << 63)
 
 // --- Analog Constants (Tuned) ---
-#define GAMMA 0.1          // Coupling damping
+#define GAMMA 0.02         // Coupling damping
 #define LAMBDA 0.05        // Entropy damping
 #define SAT_LIMIT 1e6      // Saturation threshold
 #define NOISE_SIGMA 0.01   // Stochastic noise
-#define CONSENSUS_EPS 0.005 // Tighter threshold
-#define CONSENSUS_N 10     // More stable lock
+#define CONSENSUS_EPS 1e-6 // Consensus threshold
+#define CONSENSUS_N 100    // Consensus iterations
 #define ADAPT_THRESH 0.8   // φ-adaptive trigger
-#define K_COUPLING 0.15    // Increased coupling strength
+#define K_COUPLING 1.0     // Coupling strength
 
 // --- Checkpoint Constants ---
 #define CHECKPOINT_INTERVAL 100
