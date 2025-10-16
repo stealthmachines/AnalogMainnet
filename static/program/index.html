@@ -35,89 +35,28 @@
         require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.43.0/min/vs' }});
         require(['vs/editor/editor.main'], function() {
             window.editor = monaco.editor.create(document.getElementById('editor'), {
-                value: `# HDGL Lattice Program
-# This script affects the analog lattice simulation
-import math
-import time
-
-# Basic lattice interaction
-def lattice_pulse(amplitude=1.0):
-    """Send a pulse to the lattice"""
-    phase_offset = amplitude * math.sin(time.time())
-    return phase_offset
-
-# Main execution
-if __name__ == "__main__":
-    print("HDGL Lattice Program Executing...")
-
-    # Generate lattice effects
-    for i in range(10):
-        pulse = lattice_pulse(0.1 * i)
-        print(f"Pulse {i}: {pulse:.6f}")
-
-    print("Program complete - lattice affected")
-`,
+                value: '// Write your tape program here\n',
                 language: 'python',
                 theme: 'vs-dark',
                 automaticLayout: true
             });
         });
 
-        const socket = io('/program');
+        const socket = io();
 
         function sendToTape() {
             const code = window.editor.getValue();
-            console.log('Sending code to tape:', code);
             socket.emit('write_tape', { code });
         }
 
         function clearTape() {
-            console.log('Clearing tape');
             socket.emit('clear_tape');
-            window.editor.setValue('// Write your tape program here\\n');
+            window.editor.setValue('// Write your tape program here\n');
         }
-
-        socket.on('connect', function() {
-            console.log('Connected to program namespace!');
-        });
 
         socket.on('tape_status', function(data) {
-            console.log('Tape status update:', data);
-            document.title = `HDGL Program - ${data.size} chars`;
-
-            // Show lattice response if available
-            if (data.lattice_response) {
-                const responseDiv = document.getElementById('lattice-response') || createResponseDiv();
-                responseDiv.innerHTML = `
-                    <h3>Lattice Response</h3>
-                    <p><strong>Status:</strong> ${data.lattice_response}</p>
-                    ${data.execution_time ? `<p><strong>Execution Time:</strong> ${(data.execution_time * 1000).toFixed(3)}ms</p>` : ''}
-                    <p><strong>Program Size:</strong> ${data.size} characters</p>
-                    <p><strong>Last Updated:</strong> ${new Date().toLocaleTimeString()}</p>
-                `;
-            }
+            // Handle tape status updates
         });
-
-        function createResponseDiv() {
-            const responseDiv = document.createElement('div');
-            responseDiv.id = 'lattice-response';
-            responseDiv.style.cssText = `
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                width: 300px;
-                background: #2d2d30;
-                color: #cccccc;
-                padding: 15px;
-                border-radius: 5px;
-                border: 1px solid #3c3c3c;
-                font-family: monospace;
-                font-size: 12px;
-                z-index: 1000;
-            `;
-            document.body.appendChild(responseDiv);
-            return responseDiv;
-        }
     </script>
 </body>
 </html>
