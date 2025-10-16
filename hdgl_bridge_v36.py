@@ -29,11 +29,38 @@ import logging
 import os
 import numpy as np
 import argparse
+import threading
+try:
+    from flask import Flask, jsonify, request
+    from flask_cors import CORS
+    HAS_FLASK = True
+except ImportError:
+    Flask = jsonify = request = CORS = None
+    HAS_FLASK = False
 
 getcontext().prec = 100
 mp.mp.dps = 100
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Initialize Flask app for bridge data API
+app = Flask(__name__)
+CORS(app)
+
+# Global state for real-time data sharing
+bridge_state = {
+    'evolution_count': 0,
+    'phase_variance': 0.0,
+    'consensus_status': 'Unlocked',
+    'active_connections': 0,
+    'eth_block': 0,
+    'ipfs_hash': None,
+    'phase_history': [],
+    'resource_usage': {'cpu': 0, 'memory': 0},
+    'network_nodes': [],
+    'last_update': time.time()
+}
+state_lock = threading.Lock()
 
 # Helpers for converting Decimal <-> mpmath types safely
 def dec_to_mpf(x):
@@ -637,6 +664,65 @@ def test_deep_evolution():
     logger.info(f"✓ Deep evolution test passed (evo={state.memory['evolution_count']}, "
                f"var={float(state.memory['phase_var']):.6f})")
 
+def update_bridge_state(state, evolution_count):
+    """Update global bridge state for API access"""
+    global bridge_state
+    with state_lock:
+        bridge_state.update({
+            'evolution_count': evolution_count,
+            'phase_variance': float(state.memory.get('phase_var', 0.0)),
+            'consensus_status': 'Locked' if state.memory.get('locked', False) else 'Unlocked',
+            'last_update': time.time()
+        })
+
+        # Add to phase history (keep last 100 points)
+        bridge_state['phase_history'].append({
+            'time': time.time(),
+            'variance': float(state.memory.get('phase_var', 0.0)),
+            'evolution': evolution_count
+        })
+        if len(bridge_state['phase_history']) > 100:
+            bridge_state['phase_history'].pop(0)
+
+# API Endpoints for real-time data
+@app.route('/api/status')
+def get_status():
+    """Get current bridge status"""
+    with state_lock:
+        return jsonify(bridge_state.copy())
+
+@app.route('/api/evolution')
+def get_evolution():
+    """Get evolution count and consensus status"""
+    with state_lock:
+        return jsonify({
+            'evolution_count': bridge_state['evolution_count'],
+            'consensus_status': bridge_state['consensus_status'],
+            'phase_variance': bridge_state['phase_variance']
+        })
+
+@app.route('/api/phase_history')
+def get_phase_history():
+    """Get phase variance history for charting"""
+    with state_lock:
+        return jsonify(bridge_state['phase_history'].copy())
+
+@app.route('/api/network')
+def get_network():
+    """Get network topology data"""
+    with state_lock:
+        return jsonify({
+            'nodes': bridge_state['network_nodes'],
+            'active_connections': bridge_state['active_connections']
+        })
+
+def start_api_server():
+    """Start Flask API server in background thread"""
+    if HAS_FLASK:
+        app.run(host='0.0.0.0', port=9999, debug=False, threaded=True)
+    else:
+        logger.warning("Flask not available, skipping API server")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='HDGL Bridge')
     parser.add_argument('--smoke', action='store_true', help='Run lightweight smoke tests (no external services)')
@@ -656,6 +742,12 @@ if __name__ == "__main__":
     print("\n✓ All tests passed; HDGL Mainnet V3.6 operational.")
     logger.info("Entering main processing loop...")
 
+    # Start API server in background thread
+    if HAS_FLASK:
+        api_thread = threading.Thread(target=start_api_server, daemon=True)
+        api_thread.start()
+        logger.info("Bridge API server started on port 9999")
+
     try:
         ckpt_mgr = CheckpointManager()  # Initialize checkpoint manager
         evolution_count = 0
@@ -673,6 +765,9 @@ if __name__ == "__main__":
 
             # Check for consensus
             detect_harmonic_consensus(state)
+
+            # Update bridge state for API access
+            update_bridge_state(state, evolution_count)
 
             # Add checkpoint for future iterations
             if evolution_count > 0 and evolution_count % CHECKPOINT_INTERVAL == 0:

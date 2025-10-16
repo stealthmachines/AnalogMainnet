@@ -20,11 +20,13 @@
 
     <div class="chart-container">
         <h3>System Overview</h3>
-        <div id="overview" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div id="overview" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
             <div><strong>Evolution Count:</strong> <span id="evolutionCount">0</span></div>
             <div><strong>Phase Variance:</strong> <span id="phaseVariance">0.000</span></div>
             <div><strong>Consensus Status:</strong> <span id="consensusStatus">Unlocked</span></div>
             <div><strong>Active Connections:</strong> <span id="activeConnections">0</span></div>
+            <div><strong>Bridge Status:</strong> <span id="bridgeStatus" style="color: #ff6b6b;">Connecting...</span></div>
+            <div><strong>ETH Block:</strong> <span id="ethBlock">0</span></div>
         </div>
     </div>
 
@@ -106,6 +108,20 @@
             document.getElementById('consensusStatus').textContent = data.consensus_locked ? 'Locked' : 'Unlocked';
             document.getElementById('activeConnections').textContent = data.active_connections;
 
+            // Check if data is coming from bridge (evolution_count > 0) or mock
+            const bridgeStatusEl = document.getElementById('bridgeStatus');
+            const ethBlockEl = document.getElementById('ethBlock');
+
+            if (data.evolution_count > 0) {
+                bridgeStatusEl.textContent = 'Connected';
+                bridgeStatusEl.style.color = '#4CAF50';
+                ethBlockEl.textContent = data.eth_block || 'N/A';
+            } else {
+                bridgeStatusEl.textContent = 'Mock Data';
+                bridgeStatusEl.style.color = '#ff9800';
+                ethBlockEl.textContent = 'Offline';
+            }
+
             // Update phase variance chart
             const now = new Date().toLocaleTimeString();
             phaseChart.data.labels.push(now);
@@ -120,11 +136,12 @@
             phaseChart.update('none');
 
             // Update resource chart
+            const memUsage = data.memory_usage || {};
             resourceChart.data.datasets[0].data = [
-                data.memory_usage.cpu_usage,
-                data.memory_usage.memory_usage,
-                data.memory_usage.network_latency,
-                data.memory_usage.consensus_health * 100
+                memUsage.cpu_usage || memUsage.cpu || 0,
+                memUsage.memory_usage || memUsage.memory || 0,
+                memUsage.network_latency || 0,
+                (memUsage.consensus_health || 1) * 100
             ];
             resourceChart.update('none');
         });

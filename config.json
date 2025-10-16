@@ -1,8 +1,11 @@
 {
-  "eth_rpc": "http://eth-node:8546",
+  "eth_rpc": "http://eth-node:8545",
   "eth_contract": "0xD885520B7EDF9a8577E87a3907c689AbB73582Ff",
-  "poll_interval": 30,
+  "eth_private_key": "0x03f78790538ac3c4f39a75e13fcad8bec91b1fe8b49f98317bc0fd7fa9bce5a8",
+  "poll_interval": 5,
   "auto_evolve": true,
   "tm_tape_size": 5,
-  "checkpoint_interval": 100
+  "checkpoint_interval": 100,
+  "ipfs_endpoint": "http://ipfs:5001",
+  "bridge_data_port": 9999
 }

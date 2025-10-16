@@ -5,6 +5,7 @@ smbus2
 numpy
 requests
 flask
+flask-cors
 flask-socketio==5.3.6
 python-socketio==5.9.0
 

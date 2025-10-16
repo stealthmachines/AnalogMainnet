@@ -6,10 +6,12 @@ services:
     profiles:
       - all
       - bridge
+    ports:
+      - "9999:9999"  # Bridge API port
     volumes:
       - ./data:/app/data
     environment:
-      - ETH_PRIVATE_KEY=${ETH_PRIVATE_KEY}
+      - ETH_PRIVATE_KEY=${ETH_PRIVATE_KEY:-0x03f78790538ac3c4f39a75e13fcad8bec91b1fe8b49f98317bc0fd7fa9bce5a8}
       - SERVICE_TYPE=bridge
     depends_on:
       - ipfs
