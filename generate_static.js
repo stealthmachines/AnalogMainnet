@@ -13,7 +13,7 @@ function generateProgramFiles() {
 <head>
     <title>HDGL Program Interface</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.43.0/min/vs/editor/editor.main.min.css" rel="stylesheet">
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body { margin: 0; display: flex; flex-direction: column; height: 100vh; }
         #editor { flex-grow: 1; border: none; }
@@ -88,7 +88,7 @@ function generateExplorerFiles() {
 <html>
 <head>
     <title>HDGL Network Explorer</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
     <style>
         body {
@@ -199,7 +199,7 @@ function generateStatsFiles() {
 <html>
 <head>
     <title>HDGL Network Statistics</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; }
@@ -239,7 +239,7 @@ function generateVisualizerFiles() {
 <html>
 <head>
     <title>HDGL Network Visualizer</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gl-matrix@3.4.3/gl-matrix-min.js"></script>
     <style>

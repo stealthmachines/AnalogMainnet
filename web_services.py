@@ -120,7 +120,35 @@ def write_tape(data):
     global program_tape
     program_tape = data.get('code', '')
     print(f'Tape updated: {len(program_tape)} characters')
-    emit('tape_status', {'code': program_tape, 'size': len(program_tape)}, broadcast=True)
+
+    # Send program to bridge for lattice execution
+    try:
+        bridge_response = requests.post('http://hdgl-bridge:9999/api/program',
+                                      json={'code': program_tape},
+                                      timeout=5)
+        if bridge_response.status_code == 200:
+            result = bridge_response.json()
+            print(f'Program sent to lattice: {result.get("status", "unknown")}')
+            emit('tape_status', {
+                'code': program_tape,
+                'size': len(program_tape),
+                'lattice_response': result.get('status', 'unknown'),
+                'execution_time': result.get('execution_time', 0)
+            }, broadcast=True)
+        else:
+            print(f'Bridge program endpoint failed: {bridge_response.status_code}')
+            emit('tape_status', {
+                'code': program_tape,
+                'size': len(program_tape),
+                'lattice_response': f'Bridge error: {bridge_response.status_code}'
+            }, broadcast=True)
+    except Exception as e:
+        print(f'Error sending program to bridge: {e}')
+        emit('tape_status', {
+            'code': program_tape,
+            'size': len(program_tape),
+            'lattice_response': f'Connection error: {str(e)}'
+        }, broadcast=True)
 
 @socketio.on('clear_tape', namespace='/program')
 def clear_tape():
@@ -208,70 +236,82 @@ def send_shader(path):
 
 def background_updates():
     """Background thread for real-time updates"""
+    print("DEBUG: Starting background updates thread", flush=True)
     while True:
-        time.sleep(2)  # Update every 2 seconds
+        try:
+            time.sleep(2)  # Update every 2 seconds
 
-        # Get real bridge data
-        bridge_data = get_bridge_data()
+            # Get real bridge data
+            bridge_data = get_bridge_data()
+            print(f"DEBUG: Bridge data - evo_count: {bridge_data.get('evolution_count', 0)}, variance: {bridge_data.get('phase_variance', 0.0)}", flush=True)
 
-        # Update network state with real data
-        network_state.update({
-            'evolution_count': bridge_data.get('evolution_count', 0),
-            'phase_variance': bridge_data.get('phase_variance', 0.0),
-            'consensus_locked': bridge_data.get('consensus_status') == 'Locked',
-            'blockHeight': network_state.get('blockHeight', 0) + (1 if random.random() < 0.1 else 0),
-            'stateHash': hashlib.sha256(f"{bridge_data.get('evolution_count', 0)}{time.time()}".encode()).hexdigest()[:16],
-            'timestamp': datetime.now().isoformat()
-        })
+            # Use app context for Socket.IO emissions
+            with app.app_context():
+                # Update network state with real data
+                network_state.update({
+                    'evolution_count': bridge_data.get('evolution_count', 0),
+                    'phase_variance': bridge_data.get('phase_variance', 0.0),
+                    'consensus_locked': bridge_data.get('consensus_status') == 'Locked',
+                    'blockHeight': network_state.get('blockHeight', 0) + (1 if random.random() < 0.1 else 0),
+                    'stateHash': hashlib.sha256(f"{bridge_data.get('evolution_count', 0)}{time.time()}".encode()).hexdigest()[:16],
+                    'timestamp': datetime.now().isoformat()
+                })
 
-        # Add new commitment when evolution count changes
-        if bridge_data.get('evolution_count', 0) % 50 == 0 and random.random() < 0.3:
-            evo_count = bridge_data.get('evolution_count', 0)
-            commit_data = f"commitment_{evo_count}"
-            new_commitment = {
-                'hash': hashlib.sha256(commit_data.encode()).hexdigest(),
-                'confirmed': bridge_data.get('consensus_status') == 'Locked',
-                'timestamp': datetime.now().isoformat()
-            }
-            commitments.insert(0, new_commitment)
-            if len(commitments) > 10:  # Keep only latest 10
-                commitments.pop()
+                # Add new commitment when evolution count changes
+                if bridge_data.get('evolution_count', 0) % 50 == 0 and random.random() < 0.3:
+                    evo_count = bridge_data.get('evolution_count', 0)
+                    commit_data = f"commitment_{evo_count}"
+                    new_commitment = {
+                        'hash': hashlib.sha256(commit_data.encode()).hexdigest(),
+                        'confirmed': bridge_data.get('consensus_status') == 'Locked',
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    commitments.insert(0, new_commitment)
+                    if len(commitments) > 10:  # Keep only latest 10
+                        commitments.pop()
 
-        # Add new snapshot when consensus is locked
-        if bridge_data.get('consensus_status') == 'Locked' and random.random() < 0.2:
-            evo_count = bridge_data.get('evolution_count', 0)
-            snapshot_data = f'snapshot_{evo_count}'
-            cid_hash = hashlib.sha256(snapshot_data.encode()).hexdigest()[:32]
-            new_snapshot = {
-                'cid': f"Qm{cid_hash}",
-                'height': network_state['blockHeight'],
-                'timestamp': datetime.now().isoformat()
-            }
-            snapshots.insert(0, new_snapshot)
-            if len(snapshots) > 5:  # Keep only latest 5
-                snapshots.pop()
+                # Add new snapshot when consensus is locked
+                if bridge_data.get('consensus_status') == 'Locked' and random.random() < 0.2:
+                    evo_count = bridge_data.get('evolution_count', 0)
+                    snapshot_data = f'snapshot_{evo_count}'
+                    cid_hash = hashlib.sha256(snapshot_data.encode()).hexdigest()[:32]
+                    new_snapshot = {
+                        'cid': f"Qm{cid_hash}",
+                        'height': network_state['blockHeight'],
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    snapshots.insert(0, new_snapshot)
+                    if len(snapshots) > 5:  # Keep only latest 5
+                        snapshots.pop()
 
-        # Broadcast updates to all connected clients
-        socketio.emit('state_update', network_state, namespace='/explorer')
-        socketio.emit('commitments_update', {'commitments': commitments}, namespace='/explorer')
-        socketio.emit('snapshots_update', {'snapshots': snapshots}, namespace='/explorer')
+                # Broadcast updates to all connected clients
+                print("DEBUG: Emitting Socket.IO events...", flush=True)
+                socketio.emit('state_update', network_state, namespace='/explorer')
+                socketio.emit('commitments_update', {'commitments': commitments}, namespace='/explorer')
+                socketio.emit('snapshots_update', {'snapshots': snapshots}, namespace='/explorer')
 
-        # Update visualizer with real network data
-        socketio.emit('network_data', {
-            'nodes': bridge_data.get('network_nodes', generate_network_nodes()),
-            'connections': generate_network_connections(),
-            'phase_data': network_state
-        }, namespace='/visualizer')
+                # Update visualizer with real network data
+                socketio.emit('network_data', {
+                    'nodes': bridge_data.get('network_nodes', generate_network_nodes()),
+                    'connections': generate_network_connections(),
+                    'phase_data': network_state
+                }, namespace='/visualizer')
 
-        # Update stats with real resource data
-        socketio.emit('stats_update', {
-            'evolution_count': bridge_data.get('evolution_count', 0),
-            'phase_variance': bridge_data.get('phase_variance', 0.0),
-            'consensus_locked': bridge_data.get('consensus_status') == 'Locked',
-            'active_connections': bridge_data.get('active_connections', 0),
-            'uptime': int(time.time()),
-            'memory_usage': bridge_data.get('resource_usage', generate_stats())
-        }, namespace='/stats')
+                # Update stats with real resource data
+                socketio.emit('stats_update', {
+                    'evolution_count': bridge_data.get('evolution_count', 0),
+                    'phase_variance': bridge_data.get('phase_variance', 0.0),
+                    'consensus_locked': bridge_data.get('consensus_status') == 'Locked',
+                    'active_connections': bridge_data.get('active_connections', 0),
+                    'uptime': int(time.time()),
+                    'memory_usage': bridge_data.get('resource_usage', generate_stats())
+                }, namespace='/stats')
+                print("DEBUG: Socket.IO events emitted successfully", flush=True)
+
+        except Exception as e:
+            print(f"DEBUG: Error in background_updates: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
 
 if __name__ == '__main__':
     service = os.environ.get('SERVICE_TYPE', 'all')

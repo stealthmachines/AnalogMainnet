@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>HDGL Network Explorer</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
     <style>
         body {
@@ -55,12 +55,6 @@
             <p>Loading...</p>
         </div>
     </div>
-    <div class="card">
-        <h2>Actions</h2>
-        <button onclick="refreshData()" style="padding: 10px 20px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            Refresh Data
-        </button>
-    </div>
     <script>
         const socket = io('/explorer');
 
@@ -68,13 +62,6 @@
             document.getElementById('latestState').innerHTML = `
                 <p><strong>Block Height:</strong> ${data.blockHeight}</p>
                 <p><strong>State Hash:</strong> <span class="hash">${data.stateHash}</span></p>
-                <p><strong>Evolution Count:</strong> ${data.evolution_count}</p>
-                <p><strong>Phase Variance:</strong> ${data.phase_variance.toFixed(6)}</p>
-                <p><strong>Consensus:</strong>
-                    <span class="status ${data.consensus_locked ? 'confirmed' : 'pending'}">
-                        ${data.consensus_locked ? 'Locked' : 'Unlocked'}
-                    </span>
-                </p>
                 <p><strong>Last Updated:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
             `;
         });
@@ -103,18 +90,6 @@
                         <small>${new Date(s.timestamp).toLocaleString()}</small>
                     </div>
                 `).join('');
-        });
-
-        function refreshData() {
-            socket.emit('request_refresh');
-        }
-
-        socket.on('connect', function() {
-            console.log('Connected to explorer');
-        });
-
-        socket.on('disconnect', function() {
-            console.log('Disconnected from explorer');
         });
     </script>
 </body>

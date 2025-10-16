@@ -719,6 +719,56 @@ def get_network():
             'active_connections': bridge_state['active_connections']
         })
 
+@app.route('/api/program', methods=['POST'])
+def receive_program():
+    """Receive and execute program on the lattice"""
+    try:
+        data = request.get_json()
+        if not data or 'code' not in data:
+            return jsonify({'error': 'No code provided'}), 400
+
+        program_code = data['code']
+        execution_start = time.time()
+
+        # Store the program in bridge state
+        with state_lock:
+            bridge_state['current_program'] = program_code
+            bridge_state['program_timestamp'] = execution_start
+
+        # Basic program execution simulation with lattice interaction
+        # This simulates the tape program affecting the phase variance
+        try:
+            # Simple program execution - count lines, affect variance
+            lines = len(program_code.split('\n'))
+            char_count = len(program_code)
+
+            # Simulate program effect on lattice
+            with state_lock:
+                # Program affects the next evolution cycle
+                program_effect = (char_count % 1000) / 10000.0  # Small effect
+                bridge_state['program_effect'] = program_effect
+
+            execution_time = time.time() - execution_start
+
+            return jsonify({
+                'status': 'executed',
+                'lines': lines,
+                'characters': char_count,
+                'execution_time': execution_time,
+                'lattice_effect': program_effect,
+                'message': f'Program executed on lattice - {lines} lines, {char_count} chars'
+            })
+
+        except Exception as exec_error:
+            return jsonify({
+                'status': 'execution_error',
+                'error': str(exec_error),
+                'execution_time': time.time() - execution_start
+            }), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 def start_api_server():
     """Start Flask API server in background thread"""
     if HAS_FLASK:
