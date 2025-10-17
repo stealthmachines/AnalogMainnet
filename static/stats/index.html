@@ -49,14 +49,35 @@
                         data: [],
                         borderColor: 'rgb(75, 192, 192)',
                         backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        tension: 0.1
+                        tension: 0.1,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
                     }]
                 },
                 options: {
                     responsive: true,
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: false,
+                            type: 'linear',
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(8);
+                                },
+                                stepSize: 0.00000001
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Phase Variance: ' + context.parsed.y.toFixed(12);
+                                }
+                            }
                         }
                     }
                 }
