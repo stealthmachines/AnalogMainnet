@@ -18,7 +18,7 @@
 #define LAMBDA 0.05        // Entropy damping
 #define SAT_LIMIT 1e6      // Saturation threshold
 #define NOISE_SIGMA 0.01   // Stochastic noise
-#define CONSENSUS_EPS 0.005 // Tighter threshold
+#define CONSENSUS_EPS 1e-6 // Consensus threshold - MATCHES MAINNET
 #define CONSENSUS_N 10     // More stable lock
 #define ADAPT_THRESH 0.8   // φ-adaptive trigger
 #define K_COUPLING 0.15    // Increased coupling strength
