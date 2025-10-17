@@ -92,7 +92,47 @@ def explorer():
 
 @socketio.on('connect', namespace='/explorer')
 def explorer_connect():
-    print('Explorer client connected')
+    print('Explorer client connected', flush=True)
+
+    # Ensure we have some initial data
+    global network_state, commitments, snapshots
+
+    # Get current bridge data to populate initial state
+    bridge_data = get_bridge_data()
+    if bridge_data:
+        network_state.update({
+            'evolution_count': bridge_data.get('evolution_count', 0),
+            'phase_variance': bridge_data.get('phase_variance', 0.0),
+            'consensus_locked': bridge_data.get('consensus_status') == 'Locked',
+            'blockHeight': network_state.get('blockHeight', 1),
+            'stateHash': hashlib.sha256(f"{bridge_data.get('evolution_count', 0)}{time.time()}".encode()).hexdigest()[:16],
+            'timestamp': datetime.now().isoformat()
+        })
+
+    # Ensure we have some initial commitments if empty
+    if not commitments:
+        for i in range(3):
+            commit_data = f"genesis_commitment_{i}"
+            commitments.append({
+                'hash': hashlib.sha256(commit_data.encode()).hexdigest(),
+                'confirmed': True,
+                'timestamp': datetime.now().isoformat()
+            })
+
+    # Ensure we have some initial snapshots if empty
+    if not snapshots:
+        for i in range(2):
+            snapshot_data = f'genesis_snapshot_{i}'
+            cid_hash = hashlib.sha256(snapshot_data.encode()).hexdigest()[:32]
+            snapshots.append({
+                'cid': f"Qm{cid_hash}",
+                'height': i + 1,
+                'timestamp': datetime.now().isoformat()
+            })
+
+    print(f"DEBUG: Sending explorer data - State: {network_state}", flush=True)
+    print(f"DEBUG: Commitments count: {len(commitments)}, Snapshots count: {len(snapshots)}", flush=True)
+
     # Send initial state
     emit('state_update', network_state)
     emit('commitments_update', {'commitments': commitments})

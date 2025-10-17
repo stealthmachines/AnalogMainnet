@@ -45,7 +45,42 @@ function generateProgramFiles() {
         require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.43.0/min/vs' }});
         require(['vs/editor/editor.main'], function() {
             window.editor = monaco.editor.create(document.getElementById('editor'), {
-                value: '// Write your tape program here\\n',
+                value: \`# HDGL Lattice Demo Script
+# Demonstrates lattice field effects using golden ratio mathematics
+
+import math
+import time
+
+def lattice_harmonic_demo():
+    """Generate harmonic pattern that affects the analog lattice"""
+    t = time.time()
+    phi = 1.618033988749895  # Golden ratio
+
+    # Create golden spiral pattern
+    nodes = []
+    for i in range(8):
+        angle = i * 2 * math.pi / phi
+        radius = math.sqrt(i + 1) * phi
+
+        # Harmonic oscillation
+        amplitude = math.sin(angle + t * phi) * math.exp(-radius / 20)
+
+        node_energy = amplitude * phi
+        nodes.append(node_energy)
+
+    # Calculate total lattice effect
+    total_effect = sum(nodes) * 0.1
+
+    print(f"Lattice nodes: {len(nodes)}")
+    print(f"Golden ratio: {phi:.6f}")
+    print(f"Lattice effect: {total_effect:.6f}")
+
+    return total_effect
+
+# Execute the demo
+result = lattice_harmonic_demo()
+print(f"Demo completed with effect: {result:.6f}")
+\`,
                 language: 'python',
                 theme: 'vs-dark',
                 automaticLayout: true
@@ -61,7 +96,42 @@ function generateProgramFiles() {
 
         function clearTape() {
             socket.emit('clear_tape');
-            window.editor.setValue('// Write your tape program here\\n');
+            window.editor.setValue(\`# HDGL Lattice Demo Script
+# Demonstrates lattice field effects using golden ratio mathematics
+
+import math
+import time
+
+def lattice_harmonic_demo():
+    """Generate harmonic pattern that affects the analog lattice"""
+    t = time.time()
+    phi = 1.618033988749895  # Golden ratio
+
+    # Create golden spiral pattern
+    nodes = []
+    for i in range(8):
+        angle = i * 2 * math.pi / phi
+        radius = math.sqrt(i + 1) * phi
+
+        # Harmonic oscillation
+        amplitude = math.sin(angle + t * phi) * math.exp(-radius / 20)
+
+        node_energy = amplitude * phi
+        nodes.append(node_energy)
+
+    # Calculate total lattice effect
+    total_effect = sum(nodes) * 0.1
+
+    print(f"Lattice nodes: {len(nodes)}")
+    print(f"Golden ratio: {phi:.6f}")
+    print(f"Lattice effect: {total_effect:.6f}")
+
+    return total_effect
+
+# Execute the demo
+result = lattice_harmonic_demo()
+print(f"Demo completed with effect: {result:.6f}")
+\`);
         }
 
         socket.on('tape_status', function(data) {
@@ -402,12 +472,17 @@ function generateVisualizerFiles() {
                 this.isAnimating = true;
                 this.visualMode = 'lattice';
                 this.networkData = { nodes: [], phase_data: {} };
+                this.selectedNode = null;
+                this.glyphData = [];
+
+                // DNA mapping system inspired by enhanced_pot_visualizer2.html
+                this.DNA_MAP = ['A', 'G', 'T', 'C'];
+                this.ternaryStates = [-1, 0, 1]; // Ternary system
 
                 this.setupEventListeners();
+                this.generateInitialGlyphs();
                 this.animate();
-            }
-
-            setupCanvas() {
+            }            setupCanvas() {
                 this.canvas.width = window.innerWidth * devicePixelRatio;
                 this.canvas.height = window.innerHeight * devicePixelRatio;
                 this.ctx.scale(devicePixelRatio, devicePixelRatio);
@@ -423,10 +498,20 @@ function generateVisualizerFiles() {
                     isDragging = true;
                     lastX = e.clientX;
                     lastY = e.clientY;
+
+                    // Check for node selection
+                    const rect = this.canvas.getBoundingClientRect();
+                    const mouseX = ((e.clientX - rect.left) - this.canvasWidth/2 - this.transform.translateX) / this.transform.scale;
+                    const mouseY = ((e.clientY - rect.top) - this.canvasHeight/2 - this.transform.translateY) / this.transform.scale;
+
+                    this.selectedNode = this.findNodeAt(mouseX, mouseY);
+                    if (this.selectedNode) {
+                        this.displayNodeInfo(this.selectedNode);
+                    }
                 });
 
                 this.canvas.addEventListener('mousemove', (e) => {
-                    if (isDragging) {
+                    if (isDragging && !this.selectedNode) {
                         const dx = (e.clientX - lastX) / this.transform.scale;
                         const dy = (e.clientY - lastY) / this.transform.scale;
                         this.transform.translateX += dx;
@@ -436,7 +521,10 @@ function generateVisualizerFiles() {
                     }
                 });
 
-                this.canvas.addEventListener('mouseup', () => { isDragging = false; });
+                this.canvas.addEventListener('mouseup', () => {
+                    isDragging = false;
+                    this.selectedNode = null;
+                });
 
                 this.canvas.addEventListener('wheel', (e) => {
                     e.preventDefault();
@@ -446,9 +534,7 @@ function generateVisualizerFiles() {
                 });
 
                 window.addEventListener('resize', () => this.setupCanvas());
-            }
-
-            updateNetworkData(data) {
+            }            updateNetworkData(data) {
                 this.networkData = data;
                 if (data.phase_data) {
                     document.getElementById('evolution').textContent = data.phase_data.evolution_count || 0;
@@ -456,6 +542,96 @@ function generateVisualizerFiles() {
                     document.getElementById('phase').textContent = ((data.phase_data.phase_variance || 0) % 1).toFixed(3);
                 }
                 document.getElementById('nodeCount').textContent = (data.nodes || []).length;
+
+                // Regenerate glyphs when data changes significantly
+                if (this.glyphData.length === 0 ||
+                    Math.abs((data.phase_data?.evolution_count || 0) - this.lastEvolutionCount) > 10) {
+                    this.generateInitialGlyphs();
+                    this.lastEvolutionCount = data.phase_data?.evolution_count || 0;
+                }
+            }
+
+            // Advanced glyph generation inspired by enhanced_pot_visualizer2.html
+            async generateEphemeralDNA64(seed, opId, idx, length) {
+                const data = seed.toString() + opId + idx + "DNA64";
+                const encoder = new TextEncoder();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+                const hashArray = new Uint8Array(hashBuffer);
+
+                let dna = '';
+                for (let i = 0; dna.length < length && i < hashArray.length; i++) {
+                    const b = hashArray[i];
+                    dna += this.DNA_MAP[b & 0x03];
+                    dna += this.DNA_MAP[(b >> 2) & 0x03];
+                    dna += this.DNA_MAP[(b >> 4) & 0x03];
+                    dna += this.DNA_MAP[(b >> 6) & 0x03];
+                }
+                return dna.substring(0, length);
+            }
+
+            generateInitialGlyphs() {
+                this.glyphData = [];
+                const evolution = this.networkData.phase_data?.evolution_count || 0;
+                const variance = this.networkData.phase_data?.phase_variance || 1.123;
+
+                // Generate glyphs using golden ratio spacing
+                const glyphCount = 21; // Fibonacci number
+                for (let i = 0; i < glyphCount; i++) {
+                    const angle = i * GOLDEN_ANGLE;
+                    const radius = Math.sqrt(i + 1) * 25;
+                    const phase = (evolution + i * variance) % (2 * Math.PI);
+                    const ternary = this.ternaryStates[Math.floor(phase % 3)];
+
+                    this.glyphData.push({
+                        id: i,
+                        x: Math.cos(angle) * radius,
+                        y: Math.sin(angle) * radius,
+                        angle: angle,
+                        radius: radius,
+                        phase: phase,
+                        ternary: ternary,
+                        energy: PHI ** (i % 3),
+                        dna64: '', // Will be generated async
+                        selected: false
+                    });
+                }
+
+                // Generate DNA sequences asynchronously
+                this.generateDNASequences();
+            }
+
+            async generateDNASequences() {
+                const evolution = this.networkData.phase_data?.evolution_count || 0;
+                for (let i = 0; i < this.glyphData.length; i++) {
+                    this.glyphData[i].dna64 = await this.generateEphemeralDNA64(evolution, 'lattice', i, 64);
+                }
+            }
+
+            findNodeAt(x, y) {
+                for (let glyph of this.glyphData) {
+                    const dx = x - glyph.x;
+                    const dy = y - glyph.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < 15) { // Hit radius
+                        return glyph;
+                    }
+                }
+                return null;
+            }
+
+            displayNodeInfo(glyph) {
+                // Update status panel with glyph information
+                const statusPanel = document.querySelector('.status-panel');
+                statusPanel.innerHTML = \`
+                    <div class="status-item">Glyph ID: \${glyph.id}</div>
+                    <div class="status-item">Ternary: \${glyph.ternary}</div>
+                    <div class="status-item">Phase: \${glyph.phase.toFixed(3)}</div>
+                    <div class="status-item">Energy: \${glyph.energy.toFixed(3)}</div>
+                    <div class="status-item">DNA: \${glyph.dna64.substring(0, 8)}...</div>
+                    <div class="status-item">Radius: \${glyph.radius.toFixed(1)}</div>
+                \`;
+                glyph.selected = true;
+                setTimeout(() => glyph.selected = false, 2000); // Clear selection after 2s
             }
 
             animate() {
@@ -493,7 +669,6 @@ function generateVisualizerFiles() {
             }
 
             renderLatticeNetwork() {
-                const nodes = this.networkData.nodes || [];
                 const centerX = 0, centerY = 0;
                 const evolution = this.networkData.phase_data?.evolution_count || 0;
                 const variance = this.networkData.phase_data?.phase_variance || 1.123;
@@ -510,42 +685,93 @@ function generateVisualizerFiles() {
                 this.ctx.fill();
                 this.ctx.stroke();
 
-                // Draw lattice nodes in golden spiral
-                nodes.forEach((node, i) => {
-                    const angle = i * GOLDEN_ANGLE + this.animationPhase * 0.1;
-                    const radius = 50 + Math.sqrt(i + 1) * 30;
-                    const nodeX = Math.cos(angle) * radius;
-                    const nodeY = Math.sin(angle) * radius;
+                // Render advanced glyphs with DNA and ternary systems
+                this.glyphData.forEach((glyph, i) => {
+                    // Update glyph position with breathing
+                    const breathingFactor = 1 + 0.2 * Math.sin(this.animationPhase * 0.5 + glyph.phase);
+                    const glyphX = glyph.x * breathingFactor;
+                    const glyphY = glyph.y * breathingFactor;
 
-                    // Individual node breathing based on variance
-                    const nodeBreathe = 1 + 0.3 * Math.sin(this.animationPhase * 0.5 + i * 0.618 + variance);
-                    const nodeRadius = (5 + i % 3) * nodeBreathe;
+                    // Ternary-based color selection
+                    let glyphColor;
+                    switch (glyph.ternary) {
+                        case -1: glyphColor = '#ff4757'; break; // Red
+                        case 0:  glyphColor = '#2ed573'; break; // Green
+                        case 1:  glyphColor = '#3742fa'; break; // Blue
+                        default: glyphColor = '#ffd700'; break; // Gold
+                    }
 
-                    // Color based on position in lattice
-                    const hue = (i * 137.5 + variance * 100) % 360; // Golden angle in degrees
-                    const nodeColor = \`hsl(\${hue}, 70%, 60%)\`;
+                    // Glyph radius based on energy and breathing
+                    const glyphRadius = (5 + glyph.energy * 2) * breathingFactor;
 
-                    // Draw connection to center
-                    this.ctx.strokeStyle = \`\${nodeColor}66\`;
-                    this.ctx.lineWidth = 1;
+                    // Draw connection to center with DNA-influenced opacity
+                    const dnaInfluence = glyph.dna64.length > 0 ?
+                        (glyph.dna64.charCodeAt(0) % 100) / 100 : 0.5;
+                    this.ctx.strokeStyle = \`\${glyphColor}\${Math.floor(dnaInfluence * 255).toString(16).padStart(2, '0')}\`;
+                    this.ctx.lineWidth = 1 + dnaInfluence;
                     this.ctx.beginPath();
                     this.ctx.moveTo(centerX, centerY);
-                    this.ctx.lineTo(nodeX, nodeY);
+                    this.ctx.lineTo(glyphX, glyphY);
                     this.ctx.stroke();
 
-                    // Draw node
-                    this.ctx.fillStyle = nodeColor;
+                    // Draw main glyph with selection highlighting
+                    if (glyph.selected) {
+                        // Selection highlight
+                        this.ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+                        this.ctx.strokeStyle = '#ffd700';
+                        this.ctx.lineWidth = 3;
+                        this.ctx.beginPath();
+                        this.ctx.arc(glyphX, glyphY, glyphRadius * 1.5, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                        this.ctx.stroke();
+                    }
+
+                    // Main glyph body
+                    this.ctx.fillStyle = glyphColor;
                     this.ctx.beginPath();
-                    this.ctx.arc(nodeX, nodeY, nodeRadius, 0, 2 * Math.PI);
+                    this.ctx.arc(glyphX, glyphY, glyphRadius, 0, 2 * Math.PI);
                     this.ctx.fill();
 
-                    // Draw node glow
-                    const gradient = this.ctx.createRadialGradient(nodeX, nodeY, 0, nodeX, nodeY, nodeRadius * 3);
-                    gradient.addColorStop(0, \`\${nodeColor}44\`);
+                    // DNA pattern overlay - draw nucleotide dots
+                    if (glyph.dna64.length > 0) {
+                        const nucleotides = glyph.dna64.substring(0, 8);
+                        for (let n = 0; n < nucleotides.length; n++) {
+                            const nucleotide = nucleotides[n];
+                            const dotAngle = (n / nucleotides.length) * 2 * Math.PI;
+                            const dotRadius = glyphRadius * 0.7;
+                            const dotX = glyphX + Math.cos(dotAngle) * dotRadius;
+                            const dotY = glyphY + Math.sin(dotAngle) * dotRadius;
+
+                            // DNA color coding
+                            let nucleotideColor;
+                            switch (nucleotide) {
+                                case 'A': nucleotideColor = '#ff6b35'; break; // Adenine - Orange
+                                case 'T': nucleotideColor = '#3742fa'; break; // Thymine - Blue
+                                case 'G': nucleotideColor = '#2ed573'; break; // Guanine - Green
+                                case 'C': nucleotideColor = '#ff3838'; break; // Cytosine - Red
+                                default:  nucleotideColor = '#ffffff'; break;
+                            }
+
+                            this.ctx.fillStyle = nucleotideColor;
+                            this.ctx.beginPath();
+                            this.ctx.arc(dotX, dotY, 2, 0, 2 * Math.PI);
+                            this.ctx.fill();
+                        }
+                    }
+
+                    // Ternary state indicator
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.font = '12px monospace';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(glyph.ternary.toString(), glyphX, glyphY + 4);
+
+                    // Glow effect
+                    const gradient = this.ctx.createRadialGradient(glyphX, glyphY, 0, glyphX, glyphY, glyphRadius * 3);
+                    gradient.addColorStop(0, \`\${glyphColor}44\`);
                     gradient.addColorStop(1, 'transparent');
                     this.ctx.fillStyle = gradient;
                     this.ctx.beginPath();
-                    this.ctx.arc(nodeX, nodeY, nodeRadius * 3, 0, 2 * Math.PI);
+                    this.ctx.arc(glyphX, glyphY, glyphRadius * 3, 0, 2 * Math.PI);
                     this.ctx.fill();
                 });
             }
