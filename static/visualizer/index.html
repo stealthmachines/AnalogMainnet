@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌟 HDGL Lattice Field Visualizer 🌟</title>
+    <title>🌟 HDGL POT Glyph Field Visualizer 🌟</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -36,10 +36,12 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
             padding: 15px;
             border-radius: 10px;
             border: 1px solid rgba(255, 215, 0, 0.3);
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
         .status-panel {
@@ -51,7 +53,23 @@
             padding: 15px;
             border-radius: 10px;
             border: 1px solid rgba(255, 215, 0, 0.5);
-            min-width: 200px;
+            min-width: 250px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .glyph-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            max-height: 200px;
+            overflow-y: auto;
         }
 
         .lattice-canvas {
@@ -78,7 +96,7 @@
             box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
         }
 
-        select {
+        select, input {
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 215, 0, 0.5);
             color: white;
@@ -91,40 +109,86 @@
             margin: 5px 0;
             font-size: 0.9em;
         }
+
+        .phi-display {
+            text-align: center;
+            font-size: 1.2em;
+            color: #ffd700;
+            margin: 10px 0;
+            text-shadow: 0 0 10px #ffd700;
+        }
+
+        .glyph-item {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 5px;
+            border-left: 3px solid #ffd700;
+            font-size: 0.8em;
+        }
+
+        .glyph-char {
+            font-size: 1.5em;
+            color: #ffd700;
+            margin-right: 10px;
+        }
+
+        .dna-sequence {
+            font-family: monospace;
+            color: #00ff88;
+            word-break: break-all;
+            margin: 3px 0;
+        }
+
+        .gear-indicator {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
-    <div class="header">🌟 HDGL Lattice Field Visualizer 🌟</div>
+    <div class="header">🌟 HDGL POT Glyph Field Visualizer 🌟</div>
 
     <div class="controls">
         <button onclick="resetView()">Reset View</button>
-        <select id="visualMode" onchange="changeMode()">
-            <option value="lattice">Lattice Network</option>
-            <option value="orbital">Orbital Mechanics</option>
-            <option value="breathing">Breathing Field</option>
-        </select>
-        <button onclick="toggleAnimation()">Toggle Animation</button>
+        <button onclick="generateGlyphField()">Generate POT Field</button>
+        <button onclick="toggleGearMode()">Toggle Gear Connections</button>
+        <label>Glyph Count: <input type="number" id="glyphCount" value="12" min="4" max="64" onchange="generateGlyphField()"></label>
+        <label>DNA Length: <input type="number" id="dnaLength" value="16" min="8" max="64" onchange="generateGlyphField()"></label>
     </div>
 
     <div class="status-panel">
+        <div class="phi-display">φ ≈ 1.618033988749</div>
         <div class="status-item">Evolution: <span id="evolution">0</span></div>
-        <div class="status-item">Variance: <span id="variance">0.000000</span></div>
-        <div class="status-item">Nodes: <span id="nodeCount">0</span></div>
+        <div class="status-item">Op Counter: <span id="opCounter">0</span></div>
+        <div class="status-item">Ledger Hash: <span id="ledgerHash">0</span></div>
+        <div class="status-item">Active Gears: <span id="activeGears">0</span></div>
         <div class="status-item">Phase: <span id="phase">0.000</span></div>
-        <div class="status-item">Mode: <span id="currentMode">Lattice</span></div>
+        <div class="status-item">Mode: <span id="currentMode">POT Lattice</span></div>
     </div>
 
     <canvas id="latticeCanvas" class="lattice-canvas"></canvas>
 
+    <div class="glyph-panel" id="glyphPanel" style="display: none;">
+        <h4>Selected Glyph Details</h4>
+        <div id="glyphDetails">Click on a glyph to see details</div>
+    </div>
+
     <script>
         const socket = io('/visualizer');
 
-        // Constants inspired by enhanced_pot_visualizer2.html
-        const PHI = 1.618033988749895;
+        // POT Constants from enhanced_pot_visualizer2.html
+        const PHI = (1 + Math.sqrt(5)) / 2;
         const INV_PHI = 1 / PHI;
         const GOLDEN_ANGLE = 2 * Math.PI * INV_PHI;
+        const DNA_MAP = ['A', 'G', 'T', 'C'];
 
-        class HDGLLatticeVisualizer {
+        let opCounter = 0;
+        let ledger = 0n;
+        let animationId = null;
+        let currentGlyphs = [];
+
+        class HDGLPOTVisualizer {
             constructor() {
                 this.canvas = document.getElementById('latticeCanvas');
                 this.ctx = this.canvas.getContext('2d');
@@ -133,17 +197,13 @@
                 this.transform = { scale: 1, translateX: 0, translateY: 0, rotation: 0 };
                 this.animationPhase = 0;
                 this.isAnimating = true;
-                this.visualMode = 'lattice';
+                this.gearMode = false;
                 this.networkData = { nodes: [], phase_data: {} };
-                this.selectedNode = null;
-                this.glyphData = [];
-
-                // DNA mapping system inspired by enhanced_pot_visualizer2.html
-                this.DNA_MAP = ['A', 'G', 'T', 'C'];
-                this.ternaryStates = [-1, 0, 1]; // Ternary system
+                this.selectedGlyph = null;
+                this.gearConnections = new Map();
 
                 this.setupEventListeners();
-                this.generateInitialGlyphs();
+                this.generateGlyphField();
                 this.animate();
             }            setupCanvas() {
                 this.canvas.width = window.innerWidth * devicePixelRatio;
@@ -237,73 +297,237 @@
                 const evolution = this.networkData.phase_data?.evolution_count || 0;
                 const variance = this.networkData.phase_data?.phase_variance || 1.123;
 
-                // Generate glyphs using golden ratio spacing
-                const glyphCount = 21; // Fibonacci number
-                for (let i = 0; i < glyphCount; i++) {
-                    const angle = i * GOLDEN_ANGLE;
-                    const radius = Math.sqrt(i + 1) * 25;
-                    const phase = (evolution + i * variance) % (2 * Math.PI);
-                    const ternary = this.ternaryStates[Math.floor(phase % 3)];
-
-                    this.glyphData.push({
-                        id: i,
-                        x: Math.cos(angle) * radius,
-                        y: Math.sin(angle) * radius,
-                        angle: angle,
-                        radius: radius,
-                        phase: phase,
-                        ternary: ternary,
-                        energy: PHI ** (i % 3),
-                        dna64: '', // Will be generated async
-                        selected: false
-                    });
                 }
 
-                // Generate DNA sequences asynchronously
-                this.generateDNASequences();
+            async generateGlyphField() {
+                currentGlyphs = [];
+                const glyphCount = parseInt(document.getElementById('glyphCount').value) || 12;
+                const dnaLength = parseInt(document.getElementById('dnaLength').value) || 16;
+
+                opCounter++;
+                ledger = BigInt(Date.now()) + BigInt(opCounter);
+
+                // Generate unique characters for POT glyph field
+                const chars = "∞φΦ∫∪∩≤≥∴∵∂∇∀∃∄∅∆∇⊗⊕⊙⊠⊡⊢⊣⊤⊥⋄⋅⋆⋇⋈⋉⋊⋋⋌⋍⋎⋏⋐⋑⋒⋓⋔⋕⋖⋗⋘⋙⋚⋛◊♠♣♥♦";
+
+                for (let i = 0; i < glyphCount; i++) {
+                    const char = chars[i % chars.length];
+
+                    // Compute vanishing point using golden ratio
+                    const radius = 20 * Math.sqrt(i + 0.5);
+                    const theta = i * GOLDEN_ANGLE;
+                    const x = radius * Math.cos(theta);
+                    const y = radius * Math.sin(theta);
+
+                    // Generate DNA sequence
+                    const dnaSequence = await this.generateEphemeralDNA64(ledger, opCounter, i, dnaLength);
+
+                    // Calculate phase with breathing
+                    const phase = await this.computePhaseWithBreathing(ledger, opCounter, i);
+
+                    const glyph = {
+                        char,
+                        x,
+                        y,
+                        index: i,
+                        dna: dnaSequence,
+                        phase,
+                        radius: radius,
+                        theta: theta,
+                        gear: Math.random() > 0.7 // Some glyphs have gear connections
+                    };
+
+                    currentGlyphs.push(glyph);
+                }
+
+                // Update UI
+                document.getElementById('opCounter').textContent = opCounter;
+                document.getElementById('ledgerHash').textContent = ledger.toString(16).substring(0, 8);
+                document.getElementById('activeGears').textContent = currentGlyphs.filter(g => g.gear).length;
+
+                this.generateGearConnections();
             }
 
-            async generateDNASequences() {
-                const evolution = this.networkData.phase_data?.evolution_count || 0;
-                for (let i = 0; i < this.glyphData.length; i++) {
-                    this.glyphData[i].dna64 = await this.generateEphemeralDNA64(evolution, 'lattice', i, 64);
+            async computePhaseWithBreathing(ledger, opId, idx) {
+                const data = ledger.toString() + opId + idx;
+                const encoder = new TextEncoder();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+                const hashArray = new Uint8Array(hashBuffer);
+
+                let phase = 0.0;
+                const contraction = 0.618;
+
+                for (let i = 0; i < hashArray.length; i++) {
+                    const val = hashArray[i] / 255.0;
+                    phase = phase * contraction + val * PHI;
+                }
+
+                return (phase * INV_PHI + opId * INV_PHI + idx * INV_PHI) % (2 * Math.PI);
+            }
+
+            generateGearConnections() {
+                this.gearConnections.clear();
+
+                for (let i = 0; i < currentGlyphs.length; i++) {
+                    if (!currentGlyphs[i].gear) continue;
+
+                    for (let j = i + 1; j < currentGlyphs.length; j++) {
+                        if (!currentGlyphs[j].gear) continue;
+
+                        const dist = Math.hypot(
+                            currentGlyphs[i].x - currentGlyphs[j].x,
+                            currentGlyphs[i].y - currentGlyphs[j].y
+                        );
+
+                        // Connect nearby gears
+                        if (dist < 100) {
+                            this.gearConnections.set(`${i}-${j}`, {
+                                from: currentGlyphs[i],
+                                to: currentGlyphs[j],
+                                strength: 1 - (dist / 100)
+                            });
+                        }
+                    }
+                }
+            }
+
+            async generateEphemeralDNA64(seed, opId, idx, length) {
+                const data = seed.toString() + opId + idx + "DNA64";
+                const encoder = new TextEncoder();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+                const hashArray = new Uint8Array(hashBuffer);
+
+                let dna = '';
+                for (let i = 0; dna.length < length && i < hashArray.length; i++) {
+                    const b = hashArray[i];
+                    dna += DNA_MAP[b & 0x03];
+                    dna += DNA_MAP[(b >> 2) & 0x03];
+                    dna += DNA_MAP[(b >> 4) & 0x03];
+                    dna += DNA_MAP[(b >> 6) & 0x03];
+                }
+                return dna.substring(0, length);
+            }
+
+            handleGlyphClick(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const point = this.inverseTransformPoint(e.clientX, e.clientY);
+                const scale = 8;
+                let closestGlyph = null;
+                let minDist = Infinity;
+
+                currentGlyphs.forEach(glyph => {
+                    const x = glyph.x * scale;
+                    const y = glyph.y * scale;
+                    const dist = Math.hypot(point.x - x, point.y - y);
+                    if (dist < 15 / this.transform.scale && dist < minDist) {
+                        minDist = dist;
+                        closestGlyph = glyph;
+                    }
+                });
+
+                if (closestGlyph) {
+                    this.selectedGlyph = closestGlyph;
+                    this.displayGlyphDetails(closestGlyph);
+                }
+            }
+
+            displayGlyphDetails(glyph) {
+                const panel = document.getElementById('glyphPanel');
+                const details = document.getElementById('glyphDetails');
+
+                details.innerHTML = `
+                    <div class="glyph-item">
+                        <span class="glyph-char">${glyph.char}</span>
+                        <div>Index: ${glyph.index}</div>
+                        <div>Position: (${glyph.x.toFixed(2)}, ${glyph.y.toFixed(2)})</div>
+                        <div>Phase: ${glyph.phase.toFixed(4)}</div>
+                        <div>Radius: ${glyph.radius.toFixed(2)}</div>
+                        <div>Theta: ${(glyph.theta * 180 / Math.PI).toFixed(1)}°</div>
+                        ${glyph.gear ? '<div class="gear-indicator">⚙ GEAR ACTIVE</div>' : ''}
+                        <div class="dna-sequence">DNA: ${glyph.dna}</div>
+                    </div>
+                `;
+
+                panel.style.display = 'block';
+            }
+
+            inverseTransformPoint(x, y) {
+                const rect = this.canvas.getBoundingClientRect();
+                const canvasX = (x - rect.left) / devicePixelRatio - this.canvasWidth / 2;
+                const canvasY = (y - rect.top) / devicePixelRatio - this.canvasHeight / 2;
+                const cosR = Math.cos(-this.transform.rotation);
+                const sinR = Math.sin(-this.transform.rotation);
+                const tx = canvasX / this.transform.scale - this.transform.translateX;
+                const ty = canvasY / this.transform.scale - this.transform.translateY;
+                return {
+                    x: tx * cosR - ty * sinR,
+                    y: tx * sinR + ty * cosR
+                };
+            }
+
+            setupCanvas() {
+                this.canvas.width = window.innerWidth * devicePixelRatio;
+                this.canvas.height = window.innerHeight * devicePixelRatio;
+                this.ctx.scale(devicePixelRatio, devicePixelRatio);
+                this.canvasWidth = window.innerWidth;
+                this.canvasHeight = window.innerHeight;
+            }
+
+            setupEventListeners() {
+                let isDragging = false;
+                let lastX, lastY;
+
+                this.canvas.addEventListener('mousedown', (e) => {
+                    if (e.shiftKey) {
+                        this.handleGlyphClick(e);
+                        return;
+                    }
+
+                    isDragging = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                });
+
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const dx = (e.clientX - lastX) / this.transform.scale;
+                        const dy = (e.clientY - lastY) / this.transform.scale;
+                        this.transform.translateX += dx;
+                        this.transform.translateY += dy;
+                        lastX = e.clientX;
+                        lastY = e.clientY;
+                    }
+                });
+
+                this.canvas.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                    this.transform.scale *= zoomFactor;
+                    this.transform.scale = Math.max(0.1, Math.min(5, this.transform.scale));
+                });
+
+                window.addEventListener('resize', () => this.setupCanvas());
+            }
+
+            updateNetworkData(data) {
+                this.networkData = data;
+                if (data.phase_data) {
+                    document.getElementById('evolution').textContent = data.phase_data.evolution_count || 0;
+                    document.getElementById('phase').textContent = ((data.phase_data.phase_variance || 0) % 1).toFixed(3);
                 }
             }
 
             findNodeAt(x, y) {
-                for (let glyph of this.glyphData) {
-                    const dx = x - glyph.x;
-                    const dy = y - glyph.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    if (distance < 15) { // Hit radius
-                        return glyph;
-                    }
-                }
-                return null;
-            }
-
-            displayNodeInfo(glyph) {
-                // Update status panel with glyph information
-                const statusPanel = document.querySelector('.status-panel');
-                statusPanel.innerHTML = `
-                    <div class="status-item">Glyph ID: ${glyph.id}</div>
-                    <div class="status-item">Ternary: ${glyph.ternary}</div>
-                    <div class="status-item">Phase: ${glyph.phase.toFixed(3)}</div>
-                    <div class="status-item">Energy: ${glyph.energy.toFixed(3)}</div>
-                    <div class="status-item">DNA: ${glyph.dna64.substring(0, 8)}...</div>
-                    <div class="status-item">Radius: ${glyph.radius.toFixed(1)}</div>
-                `;
-                glyph.selected = true;
-                setTimeout(() => glyph.selected = false, 2000); // Clear selection after 2s
-            }
-
-            animate() {
-                if (this.isAnimating) {
-                    this.animationPhase += 0.02;
-                }
-
-                this.render();
-                requestAnimationFrame(() => this.animate());
+                // Legacy support for original network nodes
+                const tolerance = 20 / this.transform.scale;
+                return (this.networkData.nodes || []).find(node => {
+                    const dist = Math.hypot(node.x - x, node.y - y);
+                    return dist < tolerance;
+                });
             }
 
             render() {
@@ -316,10 +540,145 @@
                 this.ctx.translate(this.transform.translateX, this.transform.translateY);
                 this.ctx.rotate(this.transform.rotation);
 
-                switch (this.visualMode) {
-                    case 'lattice':
-                        this.renderLatticeNetwork();
-                        break;
+                this.renderPOTGlyphField();
+                this.ctx.restore();
+            }
+
+            renderPOTGlyphField() {
+                const scale = 8;
+                const time = this.animationPhase;
+
+                // Draw glyph connections first (gear systems)
+                if (this.gearMode) {
+                    this.ctx.strokeStyle = 'rgba(255, 107, 107, 0.6)';
+                    this.ctx.lineWidth = 2;
+                    this.gearConnections.forEach(connection => {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(connection.from.x * scale, connection.from.y * scale);
+                        this.ctx.lineTo(connection.to.x * scale, connection.to.y * scale);
+                        this.ctx.globalAlpha = connection.strength;
+                        this.ctx.stroke();
+                        this.ctx.globalAlpha = 1;
+                    });
+                }
+
+                // Draw golden ratio spiral guide
+                this.ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                for (let i = 0; i < 100; i++) {
+                    const theta = i * GOLDEN_ANGLE;
+                    const r = Math.sqrt(i + 1) * 20;
+                    const x = r * Math.cos(theta) * scale;
+                    const y = r * Math.sin(theta) * scale;
+                    if (i === 0) this.ctx.moveTo(x, y);
+                    else this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
+
+                // Draw glyphs
+                currentGlyphs.forEach((glyph, index) => {
+                    const x = glyph.x * scale;
+                    const y = glyph.y * scale;
+
+                    // Breathing animation based on phase
+                    const breathe = Math.sin(time + glyph.phase) * 0.3 + 1;
+                    const size = 20 * breathe;
+
+                    // Glow effect
+                    if (glyph.gear) {
+                        this.ctx.shadowColor = '#ff6b6b';
+                        this.ctx.shadowBlur = 15;
+                    } else {
+                        this.ctx.shadowColor = '#ffd700';
+                        this.ctx.shadowBlur = 10;
+                    }
+
+                    // Draw glyph character
+                    this.ctx.fillStyle = glyph === this.selectedGlyph ? '#ffffff' : '#ffd700';
+                    this.ctx.font = `${size}px serif`;
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText(glyph.char, x, y);
+
+                    // Reset shadow
+                    this.ctx.shadowBlur = 0;
+
+                    // Draw index
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    this.ctx.font = '12px monospace';
+                    this.ctx.fillText(glyph.index.toString(), x, y + size);
+
+                    // Draw gear indicator
+                    if (glyph.gear) {
+                        this.ctx.fillStyle = '#ff6b6b';
+                        this.ctx.font = '16px sans-serif';
+                        this.ctx.fillText('⚙', x + size/2, y - size/2);
+                    }
+                });
+
+                // Draw network nodes if available
+                if (this.networkData.nodes) {
+                    this.networkData.nodes.forEach(node => {
+                        this.ctx.fillStyle = 'rgba(0, 255, 136, 0.8)';
+                        this.ctx.beginPath();
+                        this.ctx.arc(node.x, node.y, 3, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                    });
+                }
+            }
+
+            animate() {
+                if (this.isAnimating) {
+                    this.animationPhase += 0.02;
+                }
+
+                this.render();
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // Initialize the visualizer
+        const visualizer = new HDGLPOTVisualizer();
+
+        // Socket.IO event handlers
+        socket.on('connect', function() {
+            console.log('Visualizer connected to /visualizer namespace');
+        });
+
+        socket.on('network_update', function(data) {
+            visualizer.updateNetworkData(data);
+        });
+
+        socket.on('phase_update', function(data) {
+            visualizer.updateNetworkData({ phase_data: data });
+        });
+
+        // Global functions for UI
+        function resetView() {
+            visualizer.transform = { scale: 1, translateX: 0, translateY: 0, rotation: 0 };
+        }
+
+        function generateGlyphField() {
+            visualizer.generateGlyphField();
+        }
+
+        function toggleGearMode() {
+            visualizer.gearMode = !visualizer.gearMode;
+            document.getElementById('currentMode').textContent =
+                visualizer.gearMode ? 'POT Lattice + Gears' : 'POT Lattice';
+        }
+
+        function toggleAnimation() {
+            visualizer.isAnimating = !visualizer.isAnimating;
+        }
+
+        // Initialize with some glyphs
+        generateGlyphField();
+
+    </script>
+</body>
+</html>
                     case 'orbital':
                         this.renderOrbitalMechanics();
                         break;

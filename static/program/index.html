@@ -26,7 +26,7 @@
 </head>
 <body>
     <div class="controls">
-        <button onclick="sendToTape()">Write to Tape</button>
+        <button onclick="sendToTape()">Send to Tape</button>
         <button onclick="clearTape()">Clear Tape</button>
     </div>
     <div id="editor"></div>
@@ -35,42 +35,7 @@
         require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.43.0/min/vs' }});
         require(['vs/editor/editor.main'], function() {
             window.editor = monaco.editor.create(document.getElementById('editor'), {
-                value: `# HDGL Lattice Demo Script
-# Demonstrates lattice field effects using golden ratio mathematics
-
-import math
-import time
-
-def lattice_harmonic_demo():
-    """Generate harmonic pattern that affects the analog lattice"""
-    t = time.time()
-    phi = 1.618033988749895  # Golden ratio
-
-    # Create golden spiral pattern
-    nodes = []
-    for i in range(8):
-        angle = i * 2 * math.pi / phi
-        radius = math.sqrt(i + 1) * phi
-
-        # Harmonic oscillation
-        amplitude = math.sin(angle + t * phi) * math.exp(-radius / 20)
-
-        node_energy = amplitude * phi
-        nodes.append(node_energy)
-
-    # Calculate total lattice effect
-    total_effect = sum(nodes) * 0.1
-
-    print(f"Lattice nodes: {len(nodes)}")
-    print(f"Golden ratio: {phi:.6f}")
-    print(f"Lattice effect: {total_effect:.6f}")
-
-    return total_effect
-
-# Execute the demo
-result = lattice_harmonic_demo()
-print(f"Demo completed with effect: {result:.6f}")
-`,
+                value: '// Write your tape program here\n',
                 language: 'python',
                 theme: 'vs-dark',
                 automaticLayout: true
@@ -87,46 +52,11 @@ print(f"Demo completed with effect: {result:.6f}")
 
         function clearTape() {
             socket.emit('clear_tape');
-            window.editor.setValue(`# HDGL Lattice Demo Script
-# Demonstrates lattice field effects using golden ratio mathematics
-
-import math
-import time
-
-def lattice_harmonic_demo():
-    """Generate harmonic pattern that affects the analog lattice"""
-    t = time.time()
-    phi = 1.618033988749895  # Golden ratio
-
-    # Create golden spiral pattern
-    nodes = []
-    for i in range(8):
-        angle = i * 2 * math.pi / phi
-        radius = math.sqrt(i + 1) * phi
-
-        # Harmonic oscillation
-        amplitude = math.sin(angle + t * phi) * math.exp(-radius / 20)
-
-        node_energy = amplitude * phi
-        nodes.append(node_energy)
-
-    # Calculate total lattice effect
-    total_effect = sum(nodes) * 0.1
-
-    print(f"Lattice nodes: {len(nodes)}")
-    print(f"Golden ratio: {phi:.6f}")
-    print(f"Lattice effect: {total_effect:.6f}")
-
-    return total_effect
-
-# Execute the demo
-result = lattice_harmonic_demo()
-print(f"Demo completed with effect: {result:.6f}")
-`);
+            window.editor.setValue('// Write your tape program here\n');
         }
 
         socket.on('connect', function() {
-            console.log('Program interface connected');
+            console.log('Program interface connected to /program namespace');
         });
 
         socket.on('tape_status', function(data) {
