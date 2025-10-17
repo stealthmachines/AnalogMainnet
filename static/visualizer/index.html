@@ -159,7 +159,14 @@
 
     <div class="status-panel">
         <div class="phi-display">φ ≈ 1.618033988749</div>
+        <div class="status-item">🔬 Analog Engine</div>
         <div class="status-item">Evolution: <span id="evolution">0</span></div>
+        <div class="status-item">Phase Variance: <span id="variance">0.000000</span></div>
+        <div class="status-item">Consensus: <span id="consensus">Unlocked</span></div>
+        <div class="status-item">📜 Digital Ledger</div>
+        <div class="status-item">POA Block: <span id="poaBlock">0</span></div>
+        <div class="status-item">Tape Size: <span id="tapeSize">0</span></div>
+        <div class="status-item">🎯 Glyph Field</div>
         <div class="status-item">Op Counter: <span id="opCounter">0</span></div>
         <div class="status-item">Ledger Hash: <span id="ledgerHash">0</span></div>
         <div class="status-item">Active Gears: <span id="activeGears">0</span></div>
@@ -647,12 +654,78 @@
         });
 
         socket.on('network_update', function(data) {
+            console.log('Network update received:', data);
             visualizer.updateNetworkData(data);
         });
 
         socket.on('phase_update', function(data) {
+            console.log('Phase update received:', data);
             visualizer.updateNetworkData({ phase_data: data });
+
+            // Update analog engine display
+            if (data.evolution_count !== undefined) {
+                document.getElementById('evolution').textContent = data.evolution_count;
+            }
+            if (data.phase_variance !== undefined) {
+                document.getElementById('variance').textContent = data.phase_variance.toFixed(6);
+                document.getElementById('phase').textContent = (data.phase_variance % 1).toFixed(3);
+            }
+            if (data.consensus_locked !== undefined) {
+                document.getElementById('consensus').textContent = data.consensus_locked ? 'Locked' : 'Unlocked';
+            }
         });
+
+        // Listen for tape updates from program interface
+        socket.on('tape_status', function(data) {
+            console.log('Tape status received:', data);
+            document.getElementById('tapeSize').textContent = data.size || 0;
+
+            // Regenerate glyph field when tape changes
+            if (data.size > 0) {
+                generateGlyphField();
+            }
+        });
+
+        // Listen for program actions to update visualizer
+        socket.on('program_action', function(data) {
+            console.log('Program action received:', data);
+
+            // Update status based on program activity
+            const action = data.action || 'Unknown action';
+            document.getElementById('currentMode').textContent =
+                `POT Lattice (${action})`;
+
+            // Flash effect for visual feedback
+            const statusPanel = document.querySelector('.status-panel');
+            statusPanel.style.border = '2px solid #00ff88';
+            setTimeout(() => {
+                statusPanel.style.border = '1px solid rgba(255, 215, 0, 0.5)';
+            }, 1000);
+        });
+
+        // Check POA network status periodically
+        setInterval(async function() {
+            try {
+                const response = await fetch('http://localhost:8555', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'eth_blockNumber',
+                        params: [],
+                        id: 1
+                    })
+                });
+                const data = await response.json();
+                if (data.result) {
+                    const blockNum = parseInt(data.result, 16);
+                    document.getElementById('poaBlock').textContent = blockNum;
+                }
+            } catch (error) {
+                console.log('POA network check failed:', error);
+                document.getElementById('poaBlock').textContent = 'Offline';
+            }
+        }, 5000); // Check every 5 seconds
 
         // Global functions for UI
         function resetView() {

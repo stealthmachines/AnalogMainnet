@@ -169,33 +169,48 @@ def write_tape(data):
         if bridge_response.status_code == 200:
             result = bridge_response.json()
             print(f'Program sent to lattice: {result.get("status", "unknown")}')
-            emit('tape_status', {
+            tape_status = {
                 'code': program_tape,
                 'size': len(program_tape),
                 'lattice_response': result.get('status', 'unknown'),
                 'execution_time': result.get('execution_time', 0)
-            }, broadcast=True)
+            }
+            # Broadcast to both program and visualizer namespaces
+            emit('tape_status', tape_status, broadcast=True)
+            socketio.emit('tape_status', tape_status, namespace='/visualizer')
         else:
             print(f'Bridge program endpoint failed: {bridge_response.status_code}')
-            emit('tape_status', {
+            tape_status = {
                 'code': program_tape,
                 'size': len(program_tape),
                 'lattice_response': f'Bridge error: {bridge_response.status_code}'
-            }, broadcast=True)
+            }
+            emit('tape_status', tape_status, broadcast=True)
+            socketio.emit('tape_status', tape_status, namespace='/visualizer')
     except Exception as e:
         print(f'Error sending program to bridge: {e}')
-        emit('tape_status', {
+        tape_status = {
             'code': program_tape,
             'size': len(program_tape),
             'lattice_response': f'Connection error: {str(e)}'
-        }, broadcast=True)
+        }
+        emit('tape_status', tape_status, broadcast=True)
+        socketio.emit('tape_status', tape_status, namespace='/visualizer')
 
 @socketio.on('clear_tape', namespace='/program')
 def clear_tape():
     global program_tape
     program_tape = ""
     print('Tape cleared')
-    emit('tape_status', {'code': program_tape, 'size': len(program_tape)}, broadcast=True)
+    tape_status = {'code': program_tape, 'size': len(program_tape)}
+    emit('tape_status', tape_status, broadcast=True)
+    socketio.emit('tape_status', tape_status, namespace='/visualizer')
+
+@socketio.on('program_action', namespace='/program')
+def program_action(data):
+    print(f'Program action: {data.get("action", "unknown")}')
+    # Forward to visualizer namespace
+    socketio.emit('program_action', data, namespace='/visualizer')
 
 # Visualizer Service
 @app.route('/visualizer')
