@@ -1,7 +1,7 @@
 {
   "eth_rpc": "http://eth-node:8545",
   "eth_contract": "0xD885520B7EDF9a8577E87a3907c689AbB73582Ff",
-  "eth_private_key": "REPLACE_WITH_YOUR_PRIVATE_KEY",
+  "eth_private_key": "0x493fee7f4b7e7b8b05f06b30e1b44584eada8a64a4e824bd2cfc1caf4400a5ec",
   "poll_interval": 5,
   "auto_evolve": true,
   "tm_tape_size": 5,
