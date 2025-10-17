@@ -13,8 +13,8 @@ services:
     ports:
       - "22177:22177"
       - "22177:22177/udp"
-      - "8545:8545"
-      - "8546:8546"
+      - "8555:8545"
+      - "8556:8546"
   miner1:
     build: geth-client
     restart: on-failure
@@ -30,7 +30,7 @@ services:
     ports:
       - "22171:22171"
       - "22171:22171/udp"
-      - "8547:8545"
+      - "8557:8545"
   miner2:
     build: geth-client
     restart: on-failure
@@ -46,7 +46,7 @@ services:
     ports:
       - "22172:22172"
       - "22172:22172/udp"
-      - "8548:8545"
+      - "8558:8545"
 
 
 

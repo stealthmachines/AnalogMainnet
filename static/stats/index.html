@@ -33,6 +33,55 @@
 
     <script>
         const socket = io('/stats');
+        let phaseChart, consensusChart;
+
+        // Initialize charts
+        function initCharts() {
+            const phaseCtx = document.getElementById('phaseChart').getContext('2d');
+            const consensusCtx = document.getElementById('consensusChart').getContext('2d');
+
+            phaseChart = new Chart(phaseCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Phase Variance',
+                        data: [],
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            consensusChart = new Chart(consensusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Locked', 'Unlocked'],
+                    datasets: [{
+                        data: [0, 1],
+                        backgroundColor: [
+                            'rgb(255, 99, 132)',
+                            'rgb(54, 162, 235)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true
+                }
+            });
+        }
+
+        // Initialize charts when page loads
+        document.addEventListener('DOMContentLoaded', initCharts);
 
         // Update stats in real-time
         socket.on('stats_update', function(data) {
@@ -43,6 +92,25 @@
             document.getElementById('consensus-status').textContent = data.consensus_locked ? 'Locked' : 'Unlocked';
             document.getElementById('active-connections').textContent = data.active_connections || '0';
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+
+            // Update charts with new data
+            if (phaseChart && data.phase_variance !== undefined) {
+                const now = new Date().toLocaleTimeString();
+                phaseChart.data.labels.push(now);
+                phaseChart.data.datasets[0].data.push(data.phase_variance);
+
+                // Keep only last 20 data points
+                if (phaseChart.data.labels.length > 20) {
+                    phaseChart.data.labels.shift();
+                    phaseChart.data.datasets[0].data.shift();
+                }
+                phaseChart.update('none');
+            }
+
+            if (consensusChart) {
+                consensusChart.data.datasets[0].data = data.consensus_locked ? [1, 0] : [0, 1];
+                consensusChart.update('none');
+            }
 
             // Update page title with current evolution
             document.title = `HDGL Stats - Evolution ${data.evolution_count || 0}`;
