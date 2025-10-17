@@ -77,10 +77,11 @@ print(f"Demo completed with effect: {result:.6f}")
             });
         });
 
-        const socket = io();
+        const socket = io('/program');
 
         function sendToTape() {
             const code = window.editor.getValue();
+            console.log('Sending to tape:', code.length, 'characters');
             socket.emit('write_tape', { code });
         }
 
@@ -124,8 +125,12 @@ print(f"Demo completed with effect: {result:.6f}")
 `);
         }
 
+        socket.on('connect', function() {
+            console.log('Program interface connected');
+        });
+
         socket.on('tape_status', function(data) {
-            // Handle tape status updates
+            console.log('Tape status:', data);
         });
     </script>
 </body>

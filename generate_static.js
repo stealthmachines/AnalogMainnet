@@ -87,10 +87,11 @@ print(f"Demo completed with effect: {result:.6f}")
             });
         });
 
-        const socket = io();
+        const socket = io('/program');
 
         function sendToTape() {
             const code = window.editor.getValue();
+            console.log('Sending to tape:', code.length, 'characters');
             socket.emit('write_tape', { code });
         }
 
@@ -134,8 +135,12 @@ print(f"Demo completed with effect: {result:.6f}")
 \`);
         }
 
+        socket.on('connect', function() {
+            console.log('Program interface connected');
+        });
+
         socket.on('tape_status', function(data) {
-            // Handle tape status updates
+            console.log('Tape status:', data);
         });
     </script>
 </body>
@@ -212,17 +217,26 @@ function generateExplorerFiles() {
         </div>
     </div>
     <script>
-        const socket = io();
+        const socket = io('/explorer');
+
+        socket.on('connect', function() {
+            console.log('Explorer connected to /explorer namespace');
+        });
 
         socket.on('state_update', function(data) {
+            console.log('State update received:', data);
             document.getElementById('latestState').innerHTML = \`
                 <p><strong>Block Height:</strong> \${data.blockHeight}</p>
                 <p><strong>State Hash:</strong> <span class="hash">\${data.stateHash}</span></p>
+                <p><strong>Evolution Count:</strong> \${data.evolution_count || 0}</p>
+                <p><strong>Phase Variance:</strong> \${(data.phase_variance || 0).toFixed(6)}</p>
+                <p><strong>Consensus:</strong> \${data.consensus_locked ? 'Locked' : 'Unlocked'}</p>
                 <p><strong>Last Updated:</strong> \${new Date(data.timestamp).toLocaleString()}</p>
             \`;
         });
 
         socket.on('commitments_update', function(data) {
+            console.log('Commitments update received:', data);
             document.getElementById('commitments').innerHTML = data.commitments
                 .map(c => \`
                     <div style="margin-bottom: 15px;">
@@ -238,6 +252,7 @@ function generateExplorerFiles() {
         });
 
         socket.on('snapshots_update', function(data) {
+            console.log('Snapshots update received:', data);
             document.getElementById('snapshots').innerHTML = data.snapshots
                 .map(s => \`
                     <div style="margin-bottom: 15px;">

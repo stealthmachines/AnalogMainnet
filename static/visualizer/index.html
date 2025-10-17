@@ -335,11 +335,11 @@
                 const centerX = 0, centerY = 0;
                 const evolution = this.networkData.phase_data?.evolution_count || 0;
                 const variance = this.networkData.phase_data?.phase_variance || 1.123;
-                
+
                 // Draw central hub with breathing effect
                 const hubRadius = 15 + 5 * Math.sin(this.animationPhase * 0.618);
                 const hubColor = this.networkData.phase_data?.consensus_locked ? '#00ff88' : '#ff6b6b';
-                
+
                 this.ctx.fillStyle = hubColor;
                 this.ctx.strokeStyle = '#ffd700';
                 this.ctx.lineWidth = 2;
@@ -347,28 +347,28 @@
                 this.ctx.arc(centerX, centerY, hubRadius, 0, 2 * Math.PI);
                 this.ctx.fill();
                 this.ctx.stroke();
-                
+
                 // Render advanced glyphs with DNA and ternary systems
                 this.glyphData.forEach((glyph, i) => {
                     // Update glyph position with breathing
                     const breathingFactor = 1 + 0.2 * Math.sin(this.animationPhase * 0.5 + glyph.phase);
                     const glyphX = glyph.x * breathingFactor;
                     const glyphY = glyph.y * breathingFactor;
-                    
+
                     // Ternary-based color selection
                     let glyphColor;
                     switch (glyph.ternary) {
                         case -1: glyphColor = '#ff4757'; break; // Red
-                        case 0:  glyphColor = '#2ed573'; break; // Green  
+                        case 0:  glyphColor = '#2ed573'; break; // Green
                         case 1:  glyphColor = '#3742fa'; break; // Blue
                         default: glyphColor = '#ffd700'; break; // Gold
                     }
-                    
+
                     // Glyph radius based on energy and breathing
                     const glyphRadius = (5 + glyph.energy * 2) * breathingFactor;
-                    
+
                     // Draw connection to center with DNA-influenced opacity
-                    const dnaInfluence = glyph.dna64.length > 0 ? 
+                    const dnaInfluence = glyph.dna64.length > 0 ?
                         (glyph.dna64.charCodeAt(0) % 100) / 100 : 0.5;
                     this.ctx.strokeStyle = `${glyphColor}${Math.floor(dnaInfluence * 255).toString(16).padStart(2, '0')}`;
                     this.ctx.lineWidth = 1 + dnaInfluence;
@@ -376,7 +376,7 @@
                     this.ctx.moveTo(centerX, centerY);
                     this.ctx.lineTo(glyphX, glyphY);
                     this.ctx.stroke();
-                    
+
                     // Draw main glyph with selection highlighting
                     if (glyph.selected) {
                         // Selection highlight
@@ -388,13 +388,13 @@
                         this.ctx.fill();
                         this.ctx.stroke();
                     }
-                    
+
                     // Main glyph body
                     this.ctx.fillStyle = glyphColor;
                     this.ctx.beginPath();
                     this.ctx.arc(glyphX, glyphY, glyphRadius, 0, 2 * Math.PI);
                     this.ctx.fill();
-                    
+
                     // DNA pattern overlay - draw nucleotide dots
                     if (glyph.dna64.length > 0) {
                         const nucleotides = glyph.dna64.substring(0, 8);
@@ -404,7 +404,7 @@
                             const dotRadius = glyphRadius * 0.7;
                             const dotX = glyphX + Math.cos(dotAngle) * dotRadius;
                             const dotY = glyphY + Math.sin(dotAngle) * dotRadius;
-                            
+
                             // DNA color coding
                             let nucleotideColor;
                             switch (nucleotide) {
@@ -414,20 +414,20 @@
                                 case 'C': nucleotideColor = '#ff3838'; break; // Cytosine - Red
                                 default:  nucleotideColor = '#ffffff'; break;
                             }
-                            
+
                             this.ctx.fillStyle = nucleotideColor;
                             this.ctx.beginPath();
                             this.ctx.arc(dotX, dotY, 2, 0, 2 * Math.PI);
                             this.ctx.fill();
                         }
                     }
-                    
+
                     // Ternary state indicator
                     this.ctx.fillStyle = '#ffffff';
                     this.ctx.font = '12px monospace';
                     this.ctx.textAlign = 'center';
                     this.ctx.fillText(glyph.ternary.toString(), glyphX, glyphY + 4);
-                    
+
                     // Glow effect
                     const gradient = this.ctx.createRadialGradient(glyphX, glyphY, 0, glyphX, glyphY, glyphRadius * 3);
                     gradient.addColorStop(0, `${glyphColor}44`);
