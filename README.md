@@ -5,7 +5,7 @@
 [![Version](https://img.shields.io/badge/version-2.9--production-brightgreen.svg)](https://github.com/stealthmachines/AnalogMainnet/releases/tag/v2.9-production)
 [![Security](https://img.shields.io/badge/security-audited-blue.svg)](SECURITY_AUDIT_REPORT.md)
 [![Performance](https://img.shields.io/badge/performance-grade%20A-green.svg)](#performance-metrics)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-zCHG-red.svg)](https://zchg.org/t/legal-notice-copyright-applicable-ip-and-licensing-read-me/440)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/stealthmachines/AnalogMainnet)
 
 ## 🌌 Project Overview
@@ -498,9 +498,17 @@ Rate Limiting: 7/25 requests blocked (effective)
 - ✅ Docker containerization with profiles
 - ✅ Documentation complete and up-to-date
 
-## �📄 License
+##  License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the zCHG License with ALL RIGHTS RESERVED.
+
+**Copyright Notice**: All applicable intellectual property, code, documentation, and related materials are protected under copyright law. Permission required for use, modification, or distribution.
+
+**License Authority**: Josef Kulovany
+**Contact**: charg.chg.wecharg@gmail.com
+**Full License Terms**: https://zchg.org/t/legal-notice-copyright-applicable-ip-and-licensing-read-me/440
+
+**IMPORTANT**: Express written permission from Josef Kulovany is required before copying, modifying, distributing, or using any portion of this project. ALL RIGHTS RESERVED per applicable copyright and intellectual property laws.
 
 ## 🏆 Acknowledgments
 
