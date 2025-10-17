@@ -38,6 +38,32 @@ except ImportError:
     Flask = jsonify = request = CORS = None
     HAS_FLASK = False
 
+# Simple rate limiting
+from collections import defaultdict, deque
+rate_limits = defaultdict(lambda: deque())
+
+def rate_limit(max_requests=10, window_seconds=60):
+    """Simple rate limiting decorator"""
+    def decorator(f):
+        def wrapper(*args, **kwargs):
+            client_ip = request.remote_addr if request else 'localhost'
+            now = time.time()
+
+            # Clean old requests outside window
+            while rate_limits[client_ip] and rate_limits[client_ip][0] < now - window_seconds:
+                rate_limits[client_ip].popleft()
+
+            # Check if rate limit exceeded
+            if len(rate_limits[client_ip]) >= max_requests:
+                return jsonify({'error': 'Rate limit exceeded', 'max_requests': max_requests, 'window_seconds': window_seconds}), 429
+
+            # Add current request
+            rate_limits[client_ip].append(now)
+            return f(*args, **kwargs)
+        wrapper.__name__ = f.__name__
+        return wrapper
+    return decorator
+
 getcontext().prec = 100
 mp.mp.dps = 100
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -689,12 +715,14 @@ def update_bridge_state(state, evolution_count):
 
 # API Endpoints for real-time data
 @app.route('/api/status')
+@rate_limit(max_requests=20, window_seconds=60)  # 20 requests per minute
 def get_status():
     """Get current bridge status"""
     with state_lock:
         return jsonify(bridge_state.copy())
 
 @app.route('/api/evolution')
+@rate_limit(max_requests=10, window_seconds=60)  # 10 requests per minute
 def get_evolution():
     """Get evolution count and consensus status"""
     with state_lock:

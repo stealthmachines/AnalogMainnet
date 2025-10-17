@@ -85,6 +85,108 @@ def get_mock_data():
         }
     }
 
+# Root Portal Page
+@app.route('/')
+def portal():
+    """Main portal page with links to all services"""
+    return '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HDGL Analog Mainnet V2.8 Portal</title>
+    <style>
+        body { font-family: 'Courier New', monospace; background: #0a0a0a; color: #00ff00; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .service-card {
+            background: #111; border: 1px solid #00ff00; border-radius: 8px; padding: 20px;
+            transition: all 0.3s ease; cursor: pointer;
+        }
+        .service-card:hover { background: #1a1a1a; border-color: #00ffff; transform: scale(1.02); }
+        .service-title { font-size: 1.2em; font-weight: bold; margin-bottom: 10px; color: #00ffff; }
+        .service-desc { margin-bottom: 15px; color: #cccccc; }
+        .service-link { color: #00ff00; text-decoration: none; font-weight: bold; }
+        .status { text-align: center; margin-top: 30px; padding: 15px; background: #1a1a1a; border-radius: 5px; }
+        .status-item { display: inline-block; margin: 0 20px; }
+        .status-value { color: #00ffff; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌌 HDGL Analog Mainnet V2.8</h1>
+            <p>Distributed Computing Platform for Hybrid Analog-Digital Processing</p>
+        </div>
+
+        <div class="services">
+            <div class="service-card" onclick="window.open('/explorer', '_blank')">
+                <div class="service-title">📊 Network Explorer</div>
+                <div class="service-desc">Real-time network state monitoring, consensus tracking, and blockchain exploration</div>
+                <a href="/explorer" class="service-link">Launch Explorer →</a>
+            </div>
+
+            <div class="service-card" onclick="window.open('/program', '_blank')">
+                <div class="service-title">💻 Program Interface</div>
+                <div class="service-desc">Turing Machine programming environment with analog lattice integration</div>
+                <a href="/program" class="service-link">Launch Program Editor →</a>
+            </div>
+
+            <div class="service-card" onclick="window.open('/visualizer', '_blank')">
+                <div class="service-title">🌌 3D Visualizer</div>
+                <div class="service-desc">WebGL-accelerated 3D visualization of the analog lattice network topology</div>
+                <a href="/visualizer" class="service-link">Launch Visualizer →</a>
+            </div>
+
+            <div class="service-card" onclick="window.open('/stats', '_blank')">
+                <div class="service-title">📈 Statistics Dashboard</div>
+                <div class="service-desc">Performance metrics, system analytics, and consensus statistics</div>
+                <a href="/stats" class="service-link">Launch Dashboard →</a>
+            </div>
+        </div>
+
+        <div class="status">
+            <div class="status-item">Bridge API: <span class="status-value" id="bridge-status">Checking...</span></div>
+            <div class="status-item">ChargNet POA: <span class="status-value" id="poa-status">Checking...</span></div>
+            <div class="status-item">Evolution: <span class="status-value" id="evolution-count">Checking...</span></div>
+        </div>
+    </div>
+
+    <script>
+        // Check service status
+        async function checkStatus() {
+            try {
+                const response = await fetch('http://localhost:9999/api/status');
+                const data = await response.json();
+                document.getElementById('bridge-status').textContent = 'Online';
+                document.getElementById('evolution-count').textContent = data.evolution_count || 'Unknown';
+            } catch (e) {
+                document.getElementById('bridge-status').textContent = 'Offline';
+            }
+
+            try {
+                const poaResponse = await fetch('http://localhost:8555', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1})
+                });
+                const poaData = await poaResponse.json();
+                const blockNum = parseInt(poaData.result, 16);
+                document.getElementById('poa-status').textContent = `Block ${blockNum}`;
+            } catch (e) {
+                document.getElementById('poa-status').textContent = 'Offline';
+            }
+        }
+
+        checkStatus();
+        setInterval(checkStatus, 5000);
+    </script>
+</body>
+</html>
+    '''
+
 # Explorer Service
 @app.route('/explorer')
 def explorer():
